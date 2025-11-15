@@ -10,9 +10,9 @@ import EnemyFlying from '../gameObjects/EnemyFlying.js';
 import EnemyBullet from '../gameObjects/EnemyBullet.js';
 import Explosion from '../gameObjects/Explosion.js';
 
-export class Game extends Phaser.Scene {
+export class ShmupGame extends Phaser.Scene {
     constructor() {
-        super('Game');
+        super('ShmupGame');
     }
 
     create() {

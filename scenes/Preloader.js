@@ -30,6 +30,8 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
+        this.load.script('easystar', 'src/lib/easystar.min.js');
+
         //  Load the assets for the game - see ./src/assets.js
         for (let type in ASSETS) {
             for (let key in ASSETS[type]) {
