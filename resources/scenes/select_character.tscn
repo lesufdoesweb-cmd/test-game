@@ -1,0 +1,132 @@
+[gd_scene load_steps=12 format=3 uid="uid://c1qfi3mgrx8nj"]
+
+[ext_resource type="Texture2D" uid="uid://cr64igf4vxnl" path="res://resources/sprites/ui/bg_ui.png" id="1_hllmp"]
+[ext_resource type="Script" path="res://scripts/Helpers/SelectCharacter.cs" id="2_4e2ah"]
+[ext_resource type="Texture2D" uid="uid://wlrwfcfnkyxl" path="res://resources/sprites/ui/select_character.png" id="2_vns8x"]
+[ext_resource type="SpriteFrames" uid="uid://d1jpyu1j7nk2u" path="res://resources/units/knight_character.tres" id="3_v1tlx"]
+[ext_resource type="Script" path="res://scripts/Data/KnightButton.cs" id="4_7l6xv"]
+[ext_resource type="FontFile" uid="uid://bcbj18tftdm5y" path="res://resources/fonts/04B_30__.TTF" id="4_t7xpx"]
+[ext_resource type="SpriteFrames" uid="uid://bf1iv3ca0ms21" path="res://resources/units/wizard_character.tres" id="5_27ubs"]
+[ext_resource type="Script" path="res://scripts/Data/WizardButton.cs" id="7_tfihu"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f41un"]
+atlas = ExtResource("2_vns8x")
+region = Rect2(2, 1, 35, 50)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_smpan"]
+atlas = ExtResource("2_vns8x")
+region = Rect2(72.1194, 0.209102, 35.8806, 52.9317)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f5o70"]
+atlas = ExtResource("2_vns8x")
+region = Rect2(36.949, 0.109552, 36.051, 52.9818)
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(6, 6)
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -49.5
+offset_top = -41.0
+offset_right = 49.5
+offset_bottom = 41.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("1_hllmp")
+
+[node name="Control" type="Control" parent="TextureRect"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -38.5
+offset_top = -19.5
+offset_right = 38.5
+offset_bottom = 19.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_4e2ah")
+
+[node name="Knight" type="TextureButton" parent="TextureRect/Control"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -25.0
+offset_right = 40.0
+offset_bottom = 25.0
+grow_vertical = 2
+texture_normal = SubResource("AtlasTexture_f41un")
+texture_pressed = SubResource("AtlasTexture_smpan")
+texture_hover = SubResource("AtlasTexture_f5o70")
+script = ExtResource("4_7l6xv")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="TextureRect/Control"]
+position = Vector2(20, 16.5)
+sprite_frames = ExtResource("3_v1tlx")
+animation = &"idle"
+autoplay = "idle"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="TextureRect/Control"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 47.5
+offset_right = 278.0
+offset_bottom = 119.5
+scale = Vector2(0.1, 0.1)
+theme_override_fonts/normal_font = ExtResource("4_t7xpx")
+theme_override_font_sizes/normal_font_size = 55
+text = "Knight"
+
+[node name="RichTextLabel2" type="RichTextLabel" parent="TextureRect/Control"]
+layout_mode = 0
+offset_left = 43.0
+offset_top = 46.5
+offset_right = 317.0
+offset_bottom = 118.5
+scale = Vector2(0.1, 0.1)
+theme_override_fonts/normal_font = ExtResource("4_t7xpx")
+theme_override_font_sizes/normal_font_size = 55
+text = "Wizard
+"
+
+[node name="Wizard" type="TextureButton" parent="TextureRect/Control"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -40.0
+offset_top = -25.0
+offset_bottom = 25.0
+grow_horizontal = 0
+grow_vertical = 2
+texture_normal = SubResource("AtlasTexture_f41un")
+texture_pressed = SubResource("AtlasTexture_smpan")
+texture_hover = SubResource("AtlasTexture_f5o70")
+script = ExtResource("7_tfihu")
+
+[node name="AnimatedSprite2D2" type="AnimatedSprite2D" parent="TextureRect/Control"]
+position = Vector2(57, 16.5)
+sprite_frames = ExtResource("5_27ubs")
+animation = &"walk"
+autoplay = "idle"
+
+[connection signal="pressed" from="TextureRect/Control/Knight" to="TextureRect/Control" method="_on_knight_pressed"]
+[connection signal="pressed" from="TextureRect/Control/Wizard" to="TextureRect/Control" method="_on_wizard_pressed"]

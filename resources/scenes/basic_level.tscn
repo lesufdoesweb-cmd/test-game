@@ -1,0 +1,75 @@
+[gd_scene load_steps=11 format=3 uid="uid://j3ha65cofrh0"]
+
+[ext_resource type="Script" path="res://scripts/Controllers/BasicLevelController.cs" id="1_cvg4w"]
+[ext_resource type="Script" path="res://scripts/Helpers/LevelGenerator.cs" id="3_6qeuy"]
+[ext_resource type="Script" path="res://scripts/Masters/CameraMaster.cs" id="4_366x8"]
+[ext_resource type="Script" path="res://scripts/Masters/PlayerMaster.cs" id="4_l7jpt"]
+[ext_resource type="Script" path="res://scripts/Helpers/CharacterSpawner.cs" id="4_unak1"]
+[ext_resource type="Script" path="res://scripts/Helpers/CharacterMover.cs" id="5_8cbec"]
+[ext_resource type="Script" path="res://scripts/Helpers/ItemsSpawner.cs" id="5_er0dj"]
+[ext_resource type="Texture2D" uid="uid://c7cunsda40nlp" path="res://resources/sprites/terrain/clouds.png" id="8_iv72t"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_xlo25"]
+particle_flag_disable_z = true
+emission_shape = 3
+emission_box_extents = Vector3(49.63, 200, 1)
+direction = Vector3(1, 0.5, 0)
+spread = 0.0
+initial_velocity_min = 2.0
+initial_velocity_max = 4.0
+angular_velocity_min = -1.60933e-05
+angular_velocity_max = -1.60933e-05
+gravity = Vector3(0, 0, 0)
+scale_min = 0.3
+scale_max = 2.0
+hue_variation_min = -0.02
+hue_variation_max = 0.02
+turbulence_noise_strength = 3.0
+turbulence_noise_scale = 5.0
+turbulence_noise_speed_random = 1.0
+
+[sub_resource type="Environment" id="Environment_ynol2"]
+background_mode = 3
+background_color = Color(0.424762, 0.606788, 1, 1)
+tonemap_white = 0.75
+glow_enabled = true
+adjustment_enabled = true
+
+[node name="BasicLevel" type="Node2D"]
+script = ExtResource("1_cvg4w")
+
+[node name="LevelGenerator" type="Node" parent="."]
+script = ExtResource("3_6qeuy")
+
+[node name="PlayerMaster" type="Node2D" parent="."]
+script = ExtResource("4_l7jpt")
+
+[node name="CharacterSpawner" type="Node" parent="."]
+script = ExtResource("4_unak1")
+
+[node name="ItemsSpawner" type="Node" parent="."]
+script = ExtResource("5_er0dj")
+
+[node name="CharacterMover" type="Node" parent="."]
+script = ExtResource("5_8cbec")
+
+[node name="MainCamera" type="Camera2D" parent="."]
+position = Vector2(14, 51)
+zoom = Vector2(3, 3)
+script = ExtResource("4_366x8")
+
+[node name="GPUParticles2D" type="GPUParticles2D" parent="MainCamera"]
+modulate = Color(1, 1, 1, 0.815686)
+position = Vector2(-400, -100)
+amount = 40
+process_material = SubResource("ParticleProcessMaterial_xlo25")
+texture = ExtResource("8_iv72t")
+lifetime = 307.22
+preprocess = 30.0
+speed_scale = 5.0
+visibility_rect = Rect2(-500, -500, 99999, 99999)
+trail_sections = 5
+trail_section_subdivisions = 5
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_ynol2")
