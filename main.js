@@ -1,7 +1,10 @@
 import { Boot } from './scenes/Boot.js';
 import { Preloader } from './scenes/Preloader.js';
+import { MainMenu } from './scenes/MainMenu.js';
+import { Options } from './scenes/Options.js';
 import { Start } from './scenes/Start.js';
 import { Game } from './scenes/Game.js';
+import { ShmupGame } from './scenes/ShmupGame.js';
 import { GameOver } from './scenes/GameOver.js';
 
 const config = {
@@ -23,8 +26,11 @@ const config = {
     scene: [
         Boot,
         Preloader,
+        MainMenu,
+        Options,
         Start,
         Game,
+        ShmupGame,
         GameOver
     ],
     scale: {
