@@ -102,7 +102,7 @@ export class Game extends Phaser.Scene {
             this.anims.create({
                 key: 'knight_walk',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 5, end: 14 }),
-                frameRate: 8,
+                frameRate: 12,
                 repeat: -1
             });
 
@@ -116,7 +116,7 @@ export class Game extends Phaser.Scene {
             this.anims.create({
                 key: 'orc_walk',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 30, end: 37 }),
-                frameRate: 8,
+                frameRate: 12,
                 repeat: -1
             });
             this.anims.create({
@@ -132,7 +132,7 @@ export class Game extends Phaser.Scene {
             });
 
             // --- Camera and Input ---
-            this.cameras.main.setZoom(2.5);
+            this.cameras.main.setZoom(3);
             this.cameras.main.centerOn(this.origin.x, this.origin.y + this.mapConsts.MAP_SIZE * this.mapConsts.QUARTER_HEIGHT);
 
             // --- Start Game ---
@@ -232,12 +232,13 @@ export class Game extends Phaser.Scene {
                             this.movePlayer(targetX, targetY);
                         }
                     }
-                } else if (this.playerActionState === 'attack') {
+                } else if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
                     const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                     const targetUnit = this.getUnitAtScreenPos(worldPoint.x, worldPoint.y);
                     if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
-                        const move = this.player.moves.find(m => m.type === 'attack');
+                        const move = this.player.moves.find(m => m.type === this.playerActionState);
                         this.player.stats.currentAp -= move.cost;
+                        move.currentCooldown = move.cooldown;
                         this.player.usedStandardAction = true;
                         this.player.attack(targetUnit);
                         this.cancelPlayerAction();
@@ -344,6 +345,8 @@ export class Game extends Phaser.Scene {
                     this.isMoving = false;
                     unit.sprite.play(unit.name.toLowerCase() + '_idle');
                     if (unit === this.player) {
+                        const move = this.player.moves.find(m => m.type === 'move');
+                        move.currentCooldown = move.cooldown;
                         this.player.hasMoved = true;
                         this.events.emit('action_cancelled');
                     }
@@ -353,6 +356,14 @@ export class Game extends Phaser.Scene {
 
         buildTurnOrder() {
             this.turnOrder = [...this.units].sort((a, b) => b.stats.speed - a.stats.speed);
+        }
+
+        updateCooldowns(unit) {
+            unit.moves.forEach(move => {
+                if (move.currentCooldown > 0) {
+                    move.currentCooldown--;
+                }
+            });
         }
 
         startNextTurn() {
@@ -373,6 +384,7 @@ export class Game extends Phaser.Scene {
         startPlayerTurn() {
             this.gameState = 'PLAYER_TURN';
             this.playerActionState = 'SELECTING_ACTION'; // No action selected initially
+            this.updateCooldowns(this.player);
             this.player.stats.currentAp = this.player.stats.maxAp;
             this.player.hasMoved = false;
             this.player.usedStandardAction = false;
@@ -388,14 +400,16 @@ export class Game extends Phaser.Scene {
         }
 
         onActionSelected(move) {
+            if (move.currentCooldown > 0) return;
             if (move.type === 'attack' && this.player.usedStandardAction) return;
+            if (move.type === 'long_attack' && this.player.usedStandardAction) return;
             if (move.type === 'move' && this.player.hasMoved) return;
             if (this.player.stats.currentAp < move.cost) return;
 
             this.playerActionState = move.type;
             this.events.emit('player_action_selected');
 
-            if (move.type === 'attack') {
+            if (move.type === 'attack' || move.type === 'long_attack') {
                 this.highlightRange(this.player.gridPos, move.range, 0xff0000);
                 this.highlightAttackableEnemies(move.range);
             } else if (move.type === 'move') {
@@ -490,6 +504,7 @@ export class Game extends Phaser.Scene {
 
         startEnemyTurn(enemy) {
             this.gameState = 'ENEMY_TURN';
+            this.updateCooldowns(enemy);
             this.takeEnemyTurn(enemy, () => {
                 this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
                 this.startNextTurn();

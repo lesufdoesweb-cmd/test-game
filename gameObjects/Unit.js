@@ -17,8 +17,9 @@ export class Unit {
         };
 
         this.moves = [
-            { name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0 },
-            { name: 'Attack', type: 'attack', range: 1, cost: 1 }
+            { name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 },
+            { name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0 },
+            { name: 'Long Shot', type: 'long_attack', range: 4, cost: 1, cooldown: 2, currentCooldown: 0 }
         ];
 
         this.gridPos = { x: gridX, y: gridY };

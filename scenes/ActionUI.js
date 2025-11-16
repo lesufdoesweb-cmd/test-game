@@ -5,6 +5,7 @@ export class ActionUI extends Phaser.Scene {
         super('ActionUI');
         this.slots = [];
         this.abilities = [];
+        this.cooldownTexts = [];
         this.draggingKey = null;
         this.skipTurnButton = null;
         this.cancelActionButton = null;
@@ -150,15 +151,17 @@ export class ActionUI extends Phaser.Scene {
 
         const move = ability.moveData;
         let isEnabled = true;
+        if (move.currentCooldown > 0) isEnabled = false;
         if (move.type === 'move' && unit.hasMoved) isEnabled = false;
-        if (move.type === 'attack' && unit.usedStandardAction) isEnabled = false;
+        if ((move.type === 'attack' || move.type === 'long_attack') && unit.usedStandardAction) isEnabled = false;
         if (unit.stats.currentAp < move.cost) isEnabled = false;
 
         let frame = -1;
         if (move.type === 'attack') frame = 0;
+        if (move.type === 'long_attack') frame = 2;
         if (move.type === 'move') frame = 7;
 
-        const scale = 3; // Get the scale from somewhere, or hardcode if consistent
+        const scale = 3;
         const icon = this.add.sprite(slot.x - (1 * scale), slot.y + (3 * scale), ASSETS.spritesheet.ability_atlas.key, frame)
             .setDepth(10001)
             .setData('abilityKey', ability.key)
@@ -175,6 +178,18 @@ export class ActionUI extends Phaser.Scene {
             });
         } else {
             icon.setTint(0x808080);
+            if (move.currentCooldown > 0) {
+                const cooldownText = this.add.text(icon.x, icon.y, move.currentCooldown, {
+                    fontSize: '16px',
+                    fill: '#fff',
+                    stroke: '#000',
+                    strokeThickness: 4
+                }).setOrigin(0.5, 0.5).setDepth(10002);
+                
+                // Add the text to a temporary list to be cleaned up
+                if (!this.cooldownTexts) this.cooldownTexts = [];
+                this.cooldownTexts.push(cooldownText);
+            }
         }
 
         ability.gameObject = icon;
@@ -199,6 +214,8 @@ export class ActionUI extends Phaser.Scene {
                 ability.gameObject = null;
             }
         });
+        this.cooldownTexts.forEach(text => text.destroy());
+        this.cooldownTexts = [];
     }
 
     hideAll() {

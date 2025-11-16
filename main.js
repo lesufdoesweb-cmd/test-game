@@ -17,7 +17,8 @@ const config = {
     },
     scene: [Preloader, Background, Game, TimelineUI, ActionUI, GameOver],
     render: {
-        pixelArt: true
+        pixelArt: true,
+        antialias: false
     }
 };
 
