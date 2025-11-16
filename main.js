@@ -9,6 +9,11 @@ const config = {
     type: Phaser.AUTO,
     width: 800,
     height: 600,
+    backgroundColor: '#00000000', // Transparent black
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     scene: [Preloader, Game, TimelineUI, ActionUI, GameOver],
     render: {
         pixelArt: true

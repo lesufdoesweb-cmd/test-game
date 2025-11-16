@@ -1,3 +1,5 @@
+import ASSETS from "../assets.js";
+
 export class ActionUI extends Phaser.Scene {
     constructor() {
         super('ActionUI');
@@ -7,6 +9,7 @@ export class ActionUI extends Phaser.Scene {
         this.skipTurnButton = null;
         this.cancelActionButton = null;
         this.apText = null;
+        this.actionBar = null;
     }
 
     create() {
@@ -34,17 +37,16 @@ export class ActionUI extends Phaser.Scene {
         });
 
         this.input.on('dragover', (pointer, gameObject, dropZone) => {
-            if (dropZone.getData('isSlot')) dropZone.setFillStyle(0x444444);
+            // we don't need visual feedback for the drop zone with the new bar
         });
 
         this.input.on('dragleave', (pointer, gameObject, dropZone) => {
-            if (dropZone.getData('isSlot')) dropZone.setFillStyle(0x222222);
+            // we don't need visual feedback for the drop zone with the new bar
         });
 
         this.input.on('drop', (pointer, gameObject, dropZone) => {
             if (!this.draggingKey || !dropZone.getData('isSlot')) {
                 this.resetAbilityPosition(gameObject.getData('abilityKey'));
-                if (dropZone.getData('isSlot')) dropZone.setFillStyle(0x222222);
                 return;
             }
 
@@ -56,7 +58,6 @@ export class ActionUI extends Phaser.Scene {
             this.abilities[draggedFromSlotIndex] = temp;
 
             this.refreshActionBar(this.gameScene.player);
-            dropZone.setFillStyle(0x222222);
         });
 
         this.input.on('dragend', (pointer, gameObject) => {
@@ -68,29 +69,32 @@ export class ActionUI extends Phaser.Scene {
     }
 
     createActionBar() {
-        const barWidth = 6 * 64 + 5 * 10;
-        const barHeight = 64 + 20;
-        const barX = this.scale.width / 2 - barWidth / 2;
-        const barY = this.scale.height - barHeight - 10;
+        const scale = 3;
+        const barHeight = 16 * scale;
+        const barX = this.scale.width / 2;
+        const barY = this.scale.height - barHeight / 2 - 5;
+        this.actionBar = this.add.image(barX, barY, ASSETS.image.ability_bar.key).setOrigin(0.5, 0.5).setDepth(9999).setScale(scale);
 
-        const background = this.add.graphics();
-        background.fillStyle(0x111111, 0.8);
-        background.fillRoundedRect(barX, barY, barWidth, barHeight, 10);
-        background.setDepth(9999);
+        const squareSize = 12;
+        const startX = 13;
+        const spacing = 3;
+        const barImageWidth = 115;
+
+        const firstSlotX = barX - (barImageWidth / 2) * scale + (startX + squareSize / 2) * scale;
 
         for (let i = 0; i < 6; i++) {
-            const slotX = barX + 10 + i * (64 + 10) + 32;
-            const slotY = barY + 10 + 32;
-            const slot = this.add.rectangle(slotX, slotY, 64, 64, 0x222222).setInteractive().setDepth(10000);
+            const slotX = firstSlotX + i * (squareSize + spacing) * scale;
+            const slotY = barY;
+            const slot = this.add.zone(slotX, slotY, squareSize * scale, squareSize * scale).setRectangleDropZone(squareSize * scale, squareSize * scale);
             slot.setData('isSlot', true);
             slot.setData('slotIndex', i);
-            slot.input.dropZone = true;
-            this.slots.push(slot);
+            this.slots.push({ x: slotX, y: slotY, dropZone: slot });
         }
     }
 
     createButtons() {
-        this.skipTurnButton = this.add.text(this.scale.width - 100, this.scale.height - 50, 'End Turn', {
+        const barTopY = this.scale.height - 16 * 3 - 5;
+        this.skipTurnButton = this.add.text(this.scale.width - 100, barTopY - 30, 'End Turn', {
             fontSize: '18px', backgroundColor: '#333', padding: { x: 10, y: 5 }
         }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
 
@@ -98,7 +102,7 @@ export class ActionUI extends Phaser.Scene {
             this.gameScene.events.emit('skip_turn');
         });
 
-        this.cancelActionButton = this.add.text(this.scale.width / 2, this.scale.height - 50, 'Cancel Action', {
+        this.cancelActionButton = this.add.text(this.scale.width / 2, barTopY - 30, 'Cancel Action', {
             fontSize: '18px', backgroundColor: '#800', padding: { x: 10, y: 5 }
         }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
 
@@ -109,11 +113,11 @@ export class ActionUI extends Phaser.Scene {
 
     showActions(unit) {
         this.hideAbilities();
+        this.actionBar.setVisible(true);
         this.cancelActionButton.setVisible(false);
         this.skipTurnButton.setVisible(true);
         this.apText.setText(`AP: ${unit.stats.currentAp}/${unit.stats.maxAp}`);
 
-        // Only initialize abilities if they are not set, to preserve order
         if (this.abilities.length === 0) {
             this.abilities = unit.moves.map((move, index) => ({
                 key: move.type, name: move.name, moveData: move
@@ -128,6 +132,7 @@ export class ActionUI extends Phaser.Scene {
 
     showCancelUI() {
         this.hideAbilities();
+        this.actionBar.setVisible(false);
         this.skipTurnButton.setVisible(false);
         this.cancelActionButton.setVisible(true);
     }
@@ -149,30 +154,30 @@ export class ActionUI extends Phaser.Scene {
         if (move.type === 'attack' && unit.usedStandardAction) isEnabled = false;
         if (unit.stats.currentAp < move.cost) isEnabled = false;
 
-        const container = this.add.container(slot.x, slot.y).setDepth(10001)
-            .setData('abilityKey', ability.key);
+        let frame = -1;
+        if (move.type === 'attack') frame = 0;
+        if (move.type === 'move') frame = 7;
 
-        const iconBg = this.add.rectangle(0, 0, 60, 60, isEnabled ? 0x555555 : 0x222222);
-        const iconText = this.add.text(0, 0, ability.name, { fontSize: '14px' }).setOrigin(0.5);
-        const costText = this.add.text(25, -25, `${move.cost}AP`, { fontSize: '12px', fill: '#ff0' }).setOrigin(0.5);
-
-        container.add([iconBg, iconText, costText]);
+        const scale = 3; // Get the scale from somewhere, or hardcode if consistent
+        const icon = this.add.sprite(slot.x - (1 * scale), slot.y + (3 * scale), ASSETS.spritesheet.ability_atlas.key, frame)
+            .setDepth(10001)
+            .setData('abilityKey', ability.key)
+            .setScale(scale);
 
         if (isEnabled) {
-            container.setInteractive(new Phaser.Geom.Rectangle(-32, -32, 64, 64), Phaser.Geom.Rectangle.Contains);
-            this.input.setDraggable(container);
-            container.setData('isDraggable', true);
-            container.on('pointerdown', (pointer) => {
+            icon.setInteractive();
+            this.input.setDraggable(icon);
+            icon.setData('isDraggable', true);
+            icon.on('pointerdown', (pointer) => {
                 if (!pointer.event.button) {
                     this.gameScene.events.emit('action_selected', ability.moveData);
                 }
             });
         } else {
-            iconText.setAlpha(0.5);
-            costText.setAlpha(0.5);
+            icon.setTint(0x808080);
         }
 
-        ability.gameObject = container;
+        ability.gameObject = icon;
     }
 
     resetAbilityPosition(abilityKey) {
@@ -198,6 +203,7 @@ export class ActionUI extends Phaser.Scene {
 
     hideAll() {
         this.hideAbilities();
+        if (this.actionBar) this.actionBar.setVisible(false);
         this.skipTurnButton.setVisible(false);
         this.cancelActionButton.setVisible(false);
         this.apText.setText('');
