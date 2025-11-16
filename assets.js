@@ -22,16 +22,9 @@ export default {
     'spritesheet': {
         basic_unit: {
             key: 'basic_unit',
-            args: ['src/assets/sprites/units/base_unit.png', {
-                frameWidth: 16,
-                frameHeight: 16,
-            }]
-        },
-        player_unit: {
-            key: 'player_unit',
-            args: ['src/assets/sprites/units/base_unit.png', {
-                frameWidth: 16,
-                frameHeight: 16,
+            args: ['src/assets/sprites/units/basic_units.png', {
+                frameWidth: 32,
+                frameHeight: 32,
             }]
         },
         ships: {

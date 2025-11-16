@@ -6,6 +6,7 @@
             this.easystar = null;
             this.player = null;
             this.playerGridPos = { x: 0, y: 0 };
+            this.grid = [];
             this.origin = { x: 0, y: 0 };
             this.mapConsts = {
                 MAP_SIZE: 9,
@@ -15,6 +16,11 @@
             }
             this.pathIndicators = [];
             this.lastHoverTile = { x: -1, y: -1 };
+
+            this.playerMoveLimit = 4;
+            this.gameState = 'PLAYER_TURN';
+            this.enemies = [];
+            this.enemyTurnIndex = 0;
         }
 
         create() {
@@ -26,9 +32,8 @@
 
             // --- Grid and Pathfinding Setup ---
             this.easystar = new EasyStar.js();
-            const grid = [];
             for (let y = 0; y < this.mapConsts.MAP_SIZE; y++) {
-                grid.push(new Array(this.mapConsts.MAP_SIZE).fill(0));
+                this.grid.push(new Array(this.mapConsts.MAP_SIZE).fill(0));
             }
             this.playerGridPos = { x: 4, y: 4 };
 
@@ -41,12 +46,12 @@
                     rockY = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
                 } while (
                     (rockX === this.playerGridPos.x && rockY === this.playerGridPos.y) ||
-                    grid[rockY][rockX] === 1 // Already a rock here
+                    this.grid[rockY][rockX] === 1 // Already a rock here
                     );
-                grid[rockY][rockX] = 1; // 1 = unwalkable
+                this.grid[rockY][rockX] = 1; // 1 = unwalkable
             }
 
-            this.easystar.setGrid(grid);
+            this.easystar.setGrid(this.grid);
             this.easystar.setAcceptableTiles([0]);
 
             // --- Map Rendering ---
@@ -58,7 +63,7 @@
                     const tile = this.add.image(screenX, screenY, ASSETS.image.forest_tiles.key);
                     tile.setDepth(gridX + gridY);
 
-                    if (grid[gridY][gridX] === 1) {
+                    if (this.grid[gridY][gridX] === 1) {
                         const rock = this.add.image(screenX, screenY - 8, ASSETS.image.rock_tile.key);
                         rock.setDepth(gridX + gridY);
                     }
@@ -84,14 +89,65 @@
             this.player = this.add.sprite(playerScreenX, playerScreenY, ASSETS.spritesheet.basic_unit.key);
             this.player.setDepth(9999999);
 
+            // --- Orc Character ---
+            let orcX, orcY;
+            do {
+                orcX = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
+                orcY = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
+            } while (
+                (orcX === this.playerGridPos.x && orcY === this.playerGridPos.y) ||
+                this.grid[orcY][orcX] === 1
+                );
+            const orcGridPos = { x: orcX, y: orcY };
+            const orcScreenX = this.origin.x + (orcGridPos.x - orcGridPos.y) * this.mapConsts.HALF_WIDTH;
+            const orcScreenY = this.origin.y + (orcGridPos.x + orcGridPos.y) * this.mapConsts.QUARTER_HEIGHT - 16;
+            const orcSprite = this.add.sprite(orcScreenX, orcScreenY, ASSETS.spritesheet.basic_unit.key);
+            orcSprite.setDepth(9999998);
+
+            const orc = {
+                sprite: orcSprite,
+                gridPos: orcGridPos,
+                moveLimit: 3
+            };
+            this.enemies.push(orc);
+
+
             // --- Animations ---
             this.anims.create({
-                key: 'walk_down',
-                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 0, end: 3 }),
+                key: 'knight_idle',
+                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 0, end: 4 }),
                 frameRate: 8,
                 repeat: -1
             });
-            this.player.play('walk_down');
+            this.anims.create({
+                key: 'knight_walk',
+                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 5, end: 14 }),
+                frameRate: 8,
+                repeat: -1
+            });
+            this.player.play('knight_idle');
+
+            // Orc animations
+            this.anims.create({
+                key: 'orc_idle',
+                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 26, end: 29 }),
+                frameRate: 6,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'orc_walk',
+                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 30, end: 37 }),
+                frameRate: 8,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'orc_attack',
+                frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 38, end: 40 }),
+                frameRate: 8,
+                repeat: 0
+            });
+
+            this.enemies[0].sprite.play('orc_idle');
 
             // --- Camera and Input ---
             this.cameras.main.setZoom(2.5);
@@ -168,15 +224,15 @@
                 if (path && path.length > 0) {
                     // Create isometric indicators for each tile in the path
                     path.forEach((tilePos, index) => {
+                        if (index === 0) return; // Don't show indicator for start tile
                         const screenX = this.origin.x + (tilePos.x - tilePos.y) * this.mapConsts.HALF_WIDTH;
                         const screenY = this.origin.y + (tilePos.x + tilePos.y) * this.mapConsts.QUARTER_HEIGHT;
 
-                        // Use different colors for start, path, and destination
-                        let color = 0x0000ff; // Blue for path
-                        if (index === 0) color = 0x00ff00; // Green for start
-                        if (index === path.length - 1) color = 0xff0000; // Red for destination
+                        const isAllowed = index <= this.playerMoveLimit;
+                        const color = isAllowed ? 0x0000ff : 0xff0000; // Blue for allowed, red for not
+                        const alpha = isAllowed ? 0.7 : 0.4;
 
-                        const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.7);
+                        const indicator = this.createIsometricIndicator(screenX, screenY, color, alpha);
 
                         // Set proper depth
                         indicator.setDepth(tilePos.x + tilePos.y + 0.5);
@@ -211,29 +267,43 @@
         }
 
         movePlayer(targetX, targetY) {
+            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) {
+                return;
+            }
             this.clearPathPreview();
             this.lastHoverTile = { x: -1, y: -1 };
 
             this.easystar.findPath(this.playerGridPos.x, this.playerGridPos.y, targetX, targetY, (path) => {
-                if (path === null) {
-                    console.log("Path was not found.");
+                if (path && path.length > 1) {
+                    const truncatedPath = path.slice(0, Math.min(path.length, this.playerMoveLimit + 1));
+                    this.moveCharacterAlongPath(truncatedPath);
                 } else {
-                    this.moveCharacterAlongPath(path);
+                    console.log("Path was not found or is too short.");
                 }
             });
             this.easystar.calculate();
         }
 
         moveCharacterAlongPath(path) {
-            if (path.length === 0) {
+            if (!path || path.length <= 1) {
+                this.isMoving = false;
+                if (this.player.anims.currentAnim.key !== 'knight_idle') {
+                    this.player.play('knight_idle');
+                }
                 return;
             }
 
             this.isMoving = true;
+            this.player.play('knight_walk');
             const tweens = [];
 
-            for(let i = 1; i < path.length; i++) {
+            for (let i = 1; i < path.length; i++) {
+                const prevPos = path[i - 1];
                 const nextPos = path[i];
+
+                const dx = nextPos.x - prevPos.x;
+                const dy = nextPos.y - prevPos.y;
+
                 const screenX = this.origin.x + (nextPos.x - nextPos.y) * this.mapConsts.HALF_WIDTH;
                 const screenY = this.origin.y + (nextPos.x + nextPos.y) * this.mapConsts.QUARTER_HEIGHT;
 
@@ -243,33 +313,163 @@
                     y: screenY - 16,
                     duration: 200,
                     onStart: () => {
-                        if (i === 1) {
-                            this.playerGridPos.x = nextPos.x;
-                            this.playerGridPos.y = nextPos.y;
+                        // West or South movement is "left-ish" on screen
+                        if (dx === -1 || dy === 1) {
+                            this.player.flipX = true;
+                        } else if (dx === 1 || dy === -1) { // East or North is "right-ish"
+                            this.player.flipX = false;
                         }
                     },
                     onComplete: () => {
                         this.playerGridPos.x = nextPos.x;
                         this.playerGridPos.y = nextPos.y;
                         this.player.setDepth(9999999);
-
-                        // Mark movement as complete on the last tween
-                        if (i === path.length - 1) {
-                            this.isMoving = false;
-                        }
                     }
                 });
             }
 
-            if (tweens.length > 0) {
-                this.tweens.chain({
-                    tweens: tweens,
-                    onComplete: () => {
-                        this.isMoving = false;
+            this.tweens.chain({
+                tweens: tweens,
+                onComplete: () => {
+                    this.isMoving = false;
+                    this.player.play('knight_idle');
+                    this.endPlayerTurn();
+                }
+            });
+        }
+
+        endPlayerTurn() {
+            this.gameState = 'ENEMY_TURN';
+            this.startEnemyTurn();
+        }
+
+        startEnemyTurn() {
+            this.enemyTurnIndex = 0;
+            this.handleNextEnemy();
+        }
+
+        handleNextEnemy() {
+            if (this.enemyTurnIndex >= this.enemies.length) {
+                this.endEnemyTurn();
+                return;
+            }
+
+            const currentEnemy = this.enemies[this.enemyTurnIndex];
+            this.takeEnemyTurn(currentEnemy, () => {
+                this.enemyTurnIndex++;
+                this.handleNextEnemy();
+            });
+        }
+
+        endEnemyTurn() {
+            this.gameState = 'PLAYER_TURN';
+        }
+
+        takeEnemyTurn(enemy, onTurnComplete) {
+            // Distance check
+            const dx = this.playerGridPos.x - enemy.gridPos.x;
+            const dy = this.playerGridPos.y - enemy.gridPos.y;
+            const distance = Math.abs(dx) + Math.abs(dy);
+
+            if (distance <= 1) {
+                // Attack
+                if (enemy.sprite.anims.currentAnim.key !== 'orc_attack') {
+                    if (dx === -1 || dy === 1) { // Player is left-ish
+                        enemy.sprite.flipX = true;
+                    } else if (dx === 1 || dy === -1) { // Player is right-ish
+                        enemy.sprite.flipX = false;
                     }
-                });
+                    enemy.sprite.play('orc_attack');
+                    enemy.sprite.once('animationcomplete', () => {
+                        enemy.sprite.play('orc_idle');
+                        onTurnComplete();
+                    });
+                } else {
+                    onTurnComplete();
+                }
             } else {
-                this.isMoving = false;
+                // --- Find a valid target tile next to the player ---
+                const targetableTiles = [];
+                const neighbors = [
+                    { x: this.playerGridPos.x + 1, y: this.playerGridPos.y }, // East
+                    { x: this.playerGridPos.x - 1, y: this.playerGridPos.y }, // West
+                    { x: this.playerGridPos.x, y: this.playerGridPos.y + 1 }, // South
+                    { x: this.playerGridPos.x, y: this.playerGridPos.y - 1 }  // North
+                ];
+
+                for (const neighbor of neighbors) {
+                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE &&
+                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE &&
+                        this.grid[neighbor.y][neighbor.x] === 0) {
+                        targetableTiles.push(neighbor);
+                    }
+                }
+
+                if (targetableTiles.length > 0) {
+                    const target = targetableTiles.sort((a, b) => {
+                        const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
+                        const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
+                        return distA - distB;
+                    })[0];
+
+                    this.easystar.avoidAdditionalPoint(this.playerGridPos.x, this.playerGridPos.y);
+                    this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
+                        if (path && path.length > 1) {
+                            const truncatedPath = path.slice(0, Math.min(path.length, enemy.moveLimit + 1));
+                            this.moveEnemyAlongPath(enemy, truncatedPath, onTurnComplete);
+                        } else {
+                            onTurnComplete(); // No path found, end turn
+                        }
+                    });
+                    this.easystar.calculate();
+                    this.easystar.stopAvoidingAdditionalPoint(this.playerGridPos.x, this.playerGridPos.y);
+                } else {
+                    onTurnComplete(); // No targetable tiles, end turn
+                }
             }
+        }
+
+        moveEnemyAlongPath(enemy, path, onCompleteCallback) {
+            if (!path || path.length <= 1) {
+                if (onCompleteCallback) onCompleteCallback();
+                return;
+            }
+
+            enemy.sprite.play('orc_walk');
+            const tweens = [];
+
+            for (let i = 1; i < path.length; i++) {
+                const prevPos = path[i - 1];
+                const nextPos = path[i];
+                const dx = nextPos.x - prevPos.x;
+                const dy = nextPos.y - prevPos.y;
+
+                const screenX = this.origin.x + (nextPos.x - nextPos.y) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y + (nextPos.x + nextPos.y) * this.mapConsts.QUARTER_HEIGHT;
+
+                tweens.push({
+                    targets: enemy.sprite,
+                    x: screenX,
+                    y: screenY - 16,
+                    duration: 200,
+                    onStart: () => {
+                        if (dx === -1 || dy === 1) enemy.sprite.flipX = true;
+                        else if (dx === 1 || dy === -1) enemy.sprite.flipX = false;
+                    },
+                    onComplete: () => {
+                        enemy.gridPos.x = nextPos.x;
+                        enemy.gridPos.y = nextPos.y;
+                        enemy.sprite.setDepth(9999998);
+                    }
+                });
+            }
+
+            this.tweens.chain({
+                tweens: tweens,
+                onComplete: () => {
+                    enemy.sprite.play('orc_idle');
+                    if (onCompleteCallback) onCompleteCallback();
+                }
+            });
         }
     }
