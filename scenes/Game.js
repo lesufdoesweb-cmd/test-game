@@ -145,6 +145,7 @@ export class Game extends Phaser.Scene {
             this.events.on('action_selected', this.onActionSelected, this);
             this.events.on('unit_died', this.onUnitDied, this);
             this.events.on('action_cancelled', this.cancelPlayerAction, this);
+            this.events.on('skip_turn', this.endPlayerTurn, this);
 
             // --- Particle Effects ---
             const particleG = this.add.graphics();
@@ -222,15 +223,24 @@ export class Game extends Phaser.Scene {
                     if (gameObjects.length > 0) {
                         const clickedZone = gameObjects.find(go => go.getData('gridX') !== undefined);
                         if (clickedZone) {
-                            this.movePlayer(clickedZone.getData('gridX'), clickedZone.getData('gridY'));
+                            const targetX = clickedZone.getData('gridX');
+                            const targetY = clickedZone.getData('gridY');
+                            const unitOnTile = this.units.find(u => u.gridPos.x === targetX && u.gridPos.y === targetY);
+                            if (unitOnTile && unitOnTile !== this.player) {
+                                return;
+                            }
+                            this.movePlayer(targetX, targetY);
                         }
                     }
                 } else if (this.playerActionState === 'attack') {
                     const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                     const targetUnit = this.getUnitAtScreenPos(worldPoint.x, worldPoint.y);
                     if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
+                        const move = this.player.moves.find(m => m.type === 'attack');
+                        this.player.stats.currentAp -= move.cost;
+                        this.player.usedStandardAction = true;
                         this.player.attack(targetUnit);
-                        this.endPlayerTurn();
+                        this.cancelPlayerAction();
                     }
                 }
             });
@@ -269,6 +279,12 @@ export class Game extends Phaser.Scene {
             }
             this.clearHighlights();
 
+            this.units.forEach(unit => {
+                if (unit !== this.player) {
+                    this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                }
+            });
+
             this.easystar.findPath(this.player.gridPos.x, this.player.gridPos.y, targetX, targetY, (path) => {
                 if (path && path.length > 1) {
                     const truncatedPath = path.slice(0, Math.min(path.length, this.player.stats.moveRange + 1));
@@ -276,6 +292,12 @@ export class Game extends Phaser.Scene {
                 } else {
                     console.log("Path was not found or is too short.");
                 }
+
+                this.units.forEach(unit => {
+                    if (unit !== this.player) {
+                        this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                    }
+                });
             });
             this.easystar.calculate();
         }
@@ -322,7 +344,8 @@ export class Game extends Phaser.Scene {
                     this.isMoving = false;
                     unit.sprite.play(unit.name.toLowerCase() + '_idle');
                     if (unit === this.player) {
-                        this.endPlayerTurn();
+                        this.player.hasMoved = true;
+                        this.events.emit('action_cancelled');
                     }
                 }
             });
@@ -350,6 +373,9 @@ export class Game extends Phaser.Scene {
         startPlayerTurn() {
             this.gameState = 'PLAYER_TURN';
             this.playerActionState = 'SELECTING_ACTION'; // No action selected initially
+            this.player.stats.currentAp = this.player.stats.maxAp;
+            this.player.hasMoved = false;
+            this.player.usedStandardAction = false;
             this.events.emit('player_turn_started', this.player);
         }
 
@@ -362,6 +388,10 @@ export class Game extends Phaser.Scene {
         }
 
         onActionSelected(move) {
+            if (move.type === 'attack' && this.player.usedStandardAction) return;
+            if (move.type === 'move' && this.player.hasMoved) return;
+            if (this.player.stats.currentAp < move.cost) return;
+
             this.playerActionState = move.type;
             this.events.emit('player_action_selected');
 
@@ -388,6 +418,16 @@ export class Game extends Phaser.Scene {
             closedList.add(`${startPos.x},${startPos.y}`);
             const highlights = [];
 
+            const enemyPositions = new Set();
+            if (color === 0x0000ff) { // Only avoid enemies for move highlights
+                this.units.forEach(unit => {
+                    if (unit !== this.player) {
+                        enemyPositions.add(`${unit.gridPos.x},${unit.gridPos.y}`);
+                    }
+                });
+            }
+
+
             while (openList.length > 0) {
                 const current = openList.shift();
                 if (current.cost >= range) continue;
@@ -400,10 +440,12 @@ export class Game extends Phaser.Scene {
                     const posKey = `${neighbor.x},${neighbor.y}`;
                     if (closedList.has(posKey)) continue;
 
+                    if (enemyPositions.has(posKey)) continue;
+
                     if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE &&
                         neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE &&
                         this.grid[neighbor.y][neighbor.x] === 0) {
-                        
+
                         closedList.add(posKey);
                         openList.push({ pos: neighbor, cost: current.cost + 1 });
 
@@ -455,30 +497,30 @@ export class Game extends Phaser.Scene {
         }
 
         takeEnemyTurn(enemy, onTurnComplete) {
-            const dx = this.player.gridPos.x - enemy.gridPos.x;
-            const dy = this.player.gridPos.y - enemy.gridPos.y;
-            const distance = Math.abs(dx) + Math.abs(dy);
+            const attackMove = enemy.moves.find(m => m.type === 'attack');
 
-            if (distance <= enemy.moves.find(m => m.type === 'attack').range) {
-                // Attack
+            const doAttack = (callback) => {
                 if (enemy.sprite.anims.currentAnim.key !== 'orc_attack') {
-                    // Flip sprite to face player
-                    if (dx < 0 || (dx === 0 && dy < 0)) { // Player is left-ish or directly up
-                        enemy.sprite.flipX = true;
-                    } else { // Player is right-ish or directly down
-                        enemy.sprite.flipX = false;
-                    }
+                    const dx = this.player.gridPos.x - enemy.gridPos.x;
+                    const dy = this.player.gridPos.y - enemy.gridPos.y;
+                    if (dx < 0 || (dx === 0 && dy < 0)) { enemy.sprite.flipX = true; }
+                    else { enemy.sprite.flipX = false; }
 
                     enemy.sprite.play('orc_attack');
                     enemy.sprite.once('animationcomplete', () => {
-                        enemy.attack(this.player); // Apply damage AFTER animation
-                        enemy.sprite.play('orc_idle'); // Return to idle
-                        onTurnComplete(); // End the turn
+                        enemy.attack(this.player);
+                        enemy.sprite.play('orc_idle');
+                        if (callback) callback();
                     });
                 } else {
-                    // If attack is already playing, just end the turn to avoid getting stuck
-                    onTurnComplete();
+                    if (callback) callback();
                 }
+            };
+
+            const distance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+
+            if (distance <= attackMove.range) {
+                doAttack(onTurnComplete);
             } else {
                 const targetableTiles = [];
                 const neighbors = [
@@ -505,7 +547,14 @@ export class Game extends Phaser.Scene {
                     this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
                         if (path && path.length > 1) {
                             const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
-                            this.moveEnemyAlongPath(enemy, truncatedPath, onTurnComplete);
+                            this.moveEnemyAlongPath(enemy, truncatedPath, () => {
+                                const newDistance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+                                if (newDistance <= attackMove.range) {
+                                    doAttack(onTurnComplete);
+                                } else {
+                                    onTurnComplete();
+                                }
+                            });
                         } else {
                             onTurnComplete();
                         }
@@ -561,6 +610,13 @@ export class Game extends Phaser.Scene {
         }
 
         onUnitDied(unit) {
+            if (unit === this.player) {
+                this.scene.stop('ActionUI');
+                this.scene.stop('TimelineUI');
+                this.scene.start('GameOver');
+                return;
+            }
+
             const unitIndex = this.units.indexOf(unit);
             if (unitIndex > -1) {
                 this.units.splice(unitIndex, 1);

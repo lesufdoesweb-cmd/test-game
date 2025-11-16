@@ -11,15 +11,20 @@ export class Unit {
             physicalDamage: 10,
             magicDamage: 0,
             speed: 10,
+            maxAp: 1,
+            currentAp: 1,
             ...stats
         };
 
         this.moves = [
-            { name: 'Move', type: 'move', range: this.stats.moveRange },
-            { name: 'Attack', type: 'attack', range: 1 }
+            { name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0 },
+            { name: 'Attack', type: 'attack', range: 1, cost: 1 }
         ];
 
         this.gridPos = { x: gridX, y: gridY };
+
+        this.hasMoved = false;
+        this.usedStandardAction = false;
 
         const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
         const screenY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
