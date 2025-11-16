@@ -1,115 +1,95 @@
     import ASSETS from '../assets.js';
+import { Unit } from '../gameObjects/Unit.js';
+import { level1 } from '../levels/level1.js';
 
-    export class Game extends Phaser.Scene {
-        constructor() {
-            super('Game');
-            this.easystar = null;
-            this.player = null;
-            this.playerGridPos = { x: 0, y: 0 };
-            this.grid = [];
-            this.origin = { x: 0, y: 0 };
-            this.mapConsts = {
-                MAP_SIZE: 9,
-                TILE_WIDTH: 31,
-                HALF_WIDTH: 0,
-                QUARTER_HEIGHT: 0,
+export class Game extends Phaser.Scene {
+    constructor() {
+        super('Game');
+        this.easystar = null;
+        this.player = null; // This will hold the player Unit object
+        this.units = []; // This will hold all Unit objects
+        this.grid = [];
+        this.origin = { x: 0, y: 0 };
+        this.mapConsts = {
+            MAP_SIZE: 9,
+            TILE_WIDTH: 31,
+            HALF_WIDTH: 0,
+            QUARTER_HEIGHT: 0,
+        }
+        this.rangeHighlights = [];
+
+        this.turnOrder = [];
+        this.turnIndex = 0;
+        this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
+    }
+
+    create() {
+        this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
+        this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
+
+        this.origin.x = this.scale.width / 2;
+        this.origin.y = this.scale.height / 2 - 100;
+
+        // --- Level Setup from Config ---
+        this.easystar = new EasyStar.js();
+        this.grid = level1.layout;
+        this.easystar.setGrid(this.grid);
+        this.easystar.setAcceptableTiles([0]);
+
+        // --- Map Rendering ---
+        for (let gridY = 0; gridY < this.grid.length; gridY++) {
+            for (let gridX = 0; gridX < this.grid[gridY].length; gridX++) {
+                const tileType = this.grid[gridY][gridX];
+                const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
+
+                const tile = this.add.image(screenX, screenY, ASSETS.image.forest_tiles.key);
+                tile.setDepth(gridX + gridY);
+
+                if (tileType === 1) {
+                    const rock = this.add.image(screenX, screenY - 8, ASSETS.image.rock_tile.key);
+                    rock.setDepth(gridX + gridY + 0.1);
+                }
+
+                const interactiveZone = this.add.zone(screenX + 8, screenY, this.mapConsts.TILE_WIDTH, this.mapConsts.TILE_WIDTH / 2);
+                interactiveZone.setDepth(gridX + gridY + 0.2);
+                interactiveZone.setData('gridX', gridX);
+                interactiveZone.setData('gridY', gridY);
+                const hitArea = new Phaser.Geom.Polygon([
+                    0, -this.mapConsts.QUARTER_HEIGHT,
+                    this.mapConsts.HALF_WIDTH, 0,
+                    0, this.mapConsts.QUARTER_HEIGHT,
+                    -this.mapConsts.HALF_WIDTH, 0
+                ]);
+                interactiveZone.setInteractive(hitArea, Phaser.Geom.Polygon.Contains);
             }
-            this.pathIndicators = [];
-            this.lastHoverTile = { x: -1, y: -1 };
-
-            this.playerMoveLimit = 4;
-            this.gameState = 'PLAYER_TURN';
-            this.enemies = [];
-            this.enemyTurnIndex = 0;
         }
 
-        create() {
-            this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
-            this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
+        // --- Unit Creation from Config ---
+        const playerStartPos = level1.playerStart;
+        this.player = new Unit(this, {
+            gridX: playerStartPos.x,
+            gridY: playerStartPos.y,
+            texture: ASSETS.spritesheet.basic_unit.key,
+            frame: 0,
+            name: 'Knight',
+            stats: { maxHealth: 120, currentHealth: 120, moveRange: 4, physicalDamage: 25, speed: 10 }
+        });
+        this.units.push(this.player);
 
-            this.origin.x = this.scale.width / 2;
-            this.origin.y = this.scale.height / 2 - 100;
-
-            // --- Grid and Pathfinding Setup ---
-            this.easystar = new EasyStar.js();
-            for (let y = 0; y < this.mapConsts.MAP_SIZE; y++) {
-                this.grid.push(new Array(this.mapConsts.MAP_SIZE).fill(0));
+        level1.enemies.forEach(enemyInfo => {
+            if (enemyInfo.type === 'Orc') {
+                const orc = new Unit(this, {
+                    gridX: enemyInfo.pos.x,
+                    gridY: enemyInfo.pos.y,
+                    texture: ASSETS.spritesheet.basic_unit.key,
+                    frame: 26,
+                    name: 'Orc',
+                    stats: { maxHealth: 80, currentHealth: 80, moveRange: 3, physicalDamage: 35, speed: 12 }
+                });
+                this.units.push(orc);
             }
-            this.playerGridPos = { x: 4, y: 4 };
-
-            // Place some rocks randomly, avoiding player start position
-            const numberOfRocks = 15;
-            for (let i = 0; i < numberOfRocks; i++) {
-                let rockX, rockY;
-                do {
-                    rockX = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
-                    rockY = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
-                } while (
-                    (rockX === this.playerGridPos.x && rockY === this.playerGridPos.y) ||
-                    this.grid[rockY][rockX] === 1 // Already a rock here
-                    );
-                this.grid[rockY][rockX] = 1; // 1 = unwalkable
-            }
-
-            this.easystar.setGrid(this.grid);
-            this.easystar.setAcceptableTiles([0]);
-
-            // --- Map Rendering ---
-            for (let gridY = 0; gridY < this.mapConsts.MAP_SIZE; gridY++) {
-                for (let gridX = 0; gridX < this.mapConsts.MAP_SIZE; gridX++) {
-                    const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
-                    const screenY = this.origin.y + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
-
-                    const tile = this.add.image(screenX, screenY, ASSETS.image.forest_tiles.key);
-                    tile.setDepth(gridX + gridY);
-
-                    if (this.grid[gridY][gridX] === 1) {
-                        const rock = this.add.image(screenX, screenY - 8, ASSETS.image.rock_tile.key);
-                        rock.setDepth(gridX + gridY);
-                    }
-
-                    // Add interactive area for hover
-                    const interactiveZone = this.add.zone(screenX + 8, screenY, this.mapConsts.TILE_WIDTH, this.mapConsts.TILE_WIDTH / 2);
-                    interactiveZone.setData('gridX', gridX);
-                    interactiveZone.setData('gridY', gridY);
-                    const hitArea = new Phaser.Geom.Polygon([
-                        0, -this.mapConsts.QUARTER_HEIGHT,
-                        this.mapConsts.HALF_WIDTH, 0,
-                        0, this.mapConsts.QUARTER_HEIGHT,
-                        -this.mapConsts.HALF_WIDTH, 0
-                    ]);
-                    interactiveZone.setInteractive(hitArea, Phaser.Geom.Polygon.Contains);
-                }
-            }
-
-            // --- Player Character ---
-            const playerScreenX = this.origin.x + (this.playerGridPos.x - this.playerGridPos.y) * this.mapConsts.HALF_WIDTH;
-            const playerScreenY = this.origin.y + (this.playerGridPos.x + this.playerGridPos.y) * this.mapConsts.QUARTER_HEIGHT - 16;
-
-            this.player = this.add.sprite(playerScreenX, playerScreenY, ASSETS.spritesheet.basic_unit.key);
-            this.player.setDepth(9999999);
-
-            // --- Orc Character ---
-            let orcX, orcY;
-            do {
-                orcX = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
-                orcY = Math.floor(Math.random() * this.mapConsts.MAP_SIZE);
-            } while (
-                (orcX === this.playerGridPos.x && orcY === this.playerGridPos.y) ||
-                this.grid[orcY][orcX] === 1
-                );
-            const orcGridPos = { x: orcX, y: orcY };
-            const orcScreenX = this.origin.x + (orcGridPos.x - orcGridPos.y) * this.mapConsts.HALF_WIDTH;
-            const orcScreenY = this.origin.y + (orcGridPos.x + orcGridPos.y) * this.mapConsts.QUARTER_HEIGHT - 16;
-            const orcSprite = this.add.sprite(orcScreenX, orcScreenY, ASSETS.spritesheet.basic_unit.key);
-            orcSprite.setDepth(9999998);
-
-            const orc = {
-                sprite: orcSprite,
-                gridPos: orcGridPos,
-                moveLimit: 3
-            };
-            this.enemies.push(orc);
+        });
 
 
             // --- Animations ---
@@ -125,7 +105,6 @@
                 frameRate: 8,
                 repeat: -1
             });
-            this.player.play('knight_idle');
 
             // Orc animations
             this.anims.create({
@@ -147,43 +126,49 @@
                 repeat: 0
             });
 
-            this.enemies[0].sprite.play('orc_idle');
+            this.player.sprite.play('knight_idle');
+            this.units.forEach(u => {
+                if (u !== this.player) u.sprite.play('orc_idle');
+            });
 
             // --- Camera and Input ---
             this.cameras.main.setZoom(2.5);
             this.cameras.main.centerOn(this.origin.x, this.origin.y + this.mapConsts.MAP_SIZE * this.mapConsts.QUARTER_HEIGHT);
 
-            // --- Hover Path Visualization ---
-            this.input.on('pointerover', (pointer, gameObjects) => {
-                if (gameObjects.length > 0 && !this.isMoving) {
-                    const hoveredZone = gameObjects[0];
-                    const gridX = hoveredZone.getData('gridX');
-                    const gridY = hoveredZone.getData('gridY');
+            // --- Start Game ---
+            this.buildTurnOrder();
+            this.scene.launch('TimelineUI', { turnOrder: this.turnOrder });
+            this.scene.launch('ActionUI');
+            this.startNextTurn();
 
-                    if (gridX !== this.lastHoverTile.x || gridY !== this.lastHoverTile.y) {
-                        this.lastHoverTile = { x: gridX, y: gridY };
-                        this.showPathPreview(gridX, gridY);
-                    }
-                }
-            });
-
-            this.input.on('pointerout', () => {
-                this.clearPathPreview();
-                this.lastHoverTile = { x: -1, y: -1 };
-            });
+            // --- Event Listeners ---
+            this.events.on('action_selected', this.onActionSelected, this);
+            this.events.on('unit_died', this.onUnitDied, this);
+            this.events.on('action_cancelled', this.cancelPlayerAction, this);
 
             this.input.on('pointerdown', (pointer, gameObjects) => {
+                if (pointer.rightButtonDown()) {
+                    this.cancelPlayerAction();
+                    return;
+                }
+
                 if (!pointer.leftButtonDown() || this.isMoving) {
                     return;
                 }
 
-                if (gameObjects.length > 0) {
-                    // Find the first game object that is a tile zone
-                    const clickedZone = gameObjects.find(go => go.getData('gridX') !== undefined);
-                    if (clickedZone) {
-                        const gridX = clickedZone.getData('gridX');
-                        const gridY = clickedZone.getData('gridY');
-                        this.movePlayer(gridX, gridY);
+                if (this.playerActionState === 'move') {
+                    if (gameObjects.length > 0) {
+                        const clickedZone = gameObjects.find(go => go.getData('gridX') !== undefined);
+                        if (clickedZone) {
+                            this.movePlayer(clickedZone.getData('gridX'), clickedZone.getData('gridY'));
+                        }
+                    }
+                } else if (this.playerActionState === 'attack') {
+                    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                    const targetUnit = this.getUnitAtScreenPos(worldPoint.x, worldPoint.y);
+                    if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
+                        this.player.attack(targetUnit);
+                        this.endPlayerTurn();
                     }
                 }
             });
@@ -197,86 +182,35 @@
             });
         }
 
+        update(time, delta) {
+            this.units.forEach(u => u.update());
+        }
+
         createIsometricIndicator(screenX, screenY, color = 0x0000ff, alpha = 0.5) {
-            // Create a diamond shape that matches the isometric cube face
             const graphics = this.add.graphics();
             graphics.fillStyle(color, alpha);
             screenY = screenY - 8;
-            // Draw a diamond shape (rotated square)
-            const size = this.mapConsts.TILE_WIDTH * 1; // Slightly smaller than the tile
-
-            // Diamond points (rotated 45 degrees)
+            const size = this.mapConsts.TILE_WIDTH * 1;
             graphics.beginPath();
-            graphics.moveTo(screenX, screenY - size/4); // Top
-            graphics.lineTo(screenX + size/2, screenY); // Right
-            graphics.lineTo(screenX, screenY + size/4); // Bottom
-            graphics.lineTo(screenX - size/2, screenY); // Left
+            graphics.moveTo(screenX, screenY - size / 4);
+            graphics.lineTo(screenX + size / 2, screenY);
+            graphics.lineTo(screenX, screenY + size / 4);
+            graphics.lineTo(screenX - size / 2, screenY);
             graphics.closePath();
             graphics.fillPath();
-
             return graphics;
         }
 
-        showPathPreview(targetX, targetY) {
-            this.clearPathPreview();
-
-            this.easystar.findPath(this.playerGridPos.x, this.playerGridPos.y, targetX, targetY, (path) => {
-                if (path && path.length > 0) {
-                    // Create isometric indicators for each tile in the path
-                    path.forEach((tilePos, index) => {
-                        if (index === 0) return; // Don't show indicator for start tile
-                        const screenX = this.origin.x + (tilePos.x - tilePos.y) * this.mapConsts.HALF_WIDTH;
-                        const screenY = this.origin.y + (tilePos.x + tilePos.y) * this.mapConsts.QUARTER_HEIGHT;
-
-                        const isAllowed = index <= this.playerMoveLimit;
-                        const color = isAllowed ? 0x0000ff : 0xff0000; // Blue for allowed, red for not
-                        const alpha = isAllowed ? 0.7 : 0.4;
-
-                        const indicator = this.createIsometricIndicator(screenX, screenY, color, alpha);
-
-                        // Set proper depth
-                        indicator.setDepth(tilePos.x + tilePos.y + 0.5);
-                        this.pathIndicators.push(indicator);
-
-                        // Add step number
-                        const stepText = this.add.text(
-                            screenX,
-                            screenY,
-                            index.toString(),
-                            {
-                                fontSize: '10px',
-                                color: '#ffffff',
-                                stroke: '#000000',
-                                strokeThickness: 2
-                            }
-                        );
-                        stepText.setOrigin(0.5);
-                        stepText.setDepth(tilePos.x + tilePos.y + 0.6);
-                        this.pathIndicators.push(stepText);
-                    });
-                }
-            });
-            this.easystar.calculate();
-        }
-
-        clearPathPreview() {
-            this.pathIndicators.forEach(indicator => {
-                indicator.destroy();
-            });
-            this.pathIndicators = [];
-        }
-
         movePlayer(targetX, targetY) {
-            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) {
+            if (this.isMoving) {
                 return;
             }
-            this.clearPathPreview();
-            this.lastHoverTile = { x: -1, y: -1 };
+            this.clearHighlights();
 
-            this.easystar.findPath(this.playerGridPos.x, this.playerGridPos.y, targetX, targetY, (path) => {
+            this.easystar.findPath(this.player.gridPos.x, this.player.gridPos.y, targetX, targetY, (path) => {
                 if (path && path.length > 1) {
-                    const truncatedPath = path.slice(0, Math.min(path.length, this.playerMoveLimit + 1));
-                    this.moveCharacterAlongPath(truncatedPath);
+                    const truncatedPath = path.slice(0, Math.min(path.length, this.player.stats.moveRange + 1));
+                    this.moveCharacterAlongPath(this.player, truncatedPath);
                 } else {
                     console.log("Path was not found or is too short.");
                 }
@@ -284,46 +218,38 @@
             this.easystar.calculate();
         }
 
-        moveCharacterAlongPath(path) {
+        moveCharacterAlongPath(unit, path) {
             if (!path || path.length <= 1) {
-                this.isMoving = false;
-                if (this.player.anims.currentAnim.key !== 'knight_idle') {
-                    this.player.play('knight_idle');
-                }
                 return;
             }
 
             this.isMoving = true;
-            this.player.play('knight_walk');
+            if (unit === this.player) {
+                this.events.emit('player_action_selected');
+            }
+            unit.sprite.play(unit.name.toLowerCase() + '_walk');
             const tweens = [];
 
             for (let i = 1; i < path.length; i++) {
-                const prevPos = path[i - 1];
                 const nextPos = path[i];
-
-                const dx = nextPos.x - prevPos.x;
-                const dy = nextPos.y - prevPos.y;
-
                 const screenX = this.origin.x + (nextPos.x - nextPos.y) * this.mapConsts.HALF_WIDTH;
                 const screenY = this.origin.y + (nextPos.x + nextPos.y) * this.mapConsts.QUARTER_HEIGHT;
 
                 tweens.push({
-                    targets: this.player,
+                    targets: unit.sprite,
                     x: screenX,
                     y: screenY - 16,
                     duration: 200,
                     onStart: () => {
-                        // West or South movement is "left-ish" on screen
-                        if (dx === -1 || dy === 1) {
-                            this.player.flipX = true;
-                        } else if (dx === 1 || dy === -1) { // East or North is "right-ish"
-                            this.player.flipX = false;
-                        }
+                        const prevPos = path[i - 1];
+                        const dx = nextPos.x - prevPos.x;
+                        const dy = nextPos.y - prevPos.y;
+                        if (dx === -1 || dy === 1) unit.sprite.flipX = true;
+                        else if (dx === 1 || dy === -1) unit.sprite.flipX = false;
                     },
                     onComplete: () => {
-                        this.playerGridPos.x = nextPos.x;
-                        this.playerGridPos.y = nextPos.y;
-                        this.player.setDepth(9999999);
+                        unit.gridPos.x = nextPos.x;
+                        unit.gridPos.y = nextPos.y;
                     }
                 });
             }
@@ -332,69 +258,153 @@
                 tweens: tweens,
                 onComplete: () => {
                     this.isMoving = false;
-                    this.player.play('knight_idle');
-                    this.endPlayerTurn();
+                    unit.sprite.play(unit.name.toLowerCase() + '_idle');
+                    if (unit === this.player) {
+                        this.endPlayerTurn();
+                    }
                 }
             });
+        }
+
+        buildTurnOrder() {
+            this.turnOrder = [...this.units].sort((a, b) => b.stats.speed - a.stats.speed);
+        }
+
+        startNextTurn() {
+            if (this.turnOrder.length === 0) return;
+            if (this.turnIndex >= this.turnOrder.length) {
+                this.turnIndex = 0;
+            }
+            const currentUnit = this.turnOrder[this.turnIndex];
+            this.events.emit('turn_changed', this.turnIndex);
+
+            if (currentUnit === this.player) {
+                this.startPlayerTurn();
+            } else {
+                this.startEnemyTurn(currentUnit);
+            }
+        }
+
+        startPlayerTurn() {
+            this.gameState = 'PLAYER_TURN';
+            this.playerActionState = 'SELECTING_ACTION'; // No action selected initially
+            this.events.emit('player_turn_started', this.player);
         }
 
         endPlayerTurn() {
-            this.gameState = 'ENEMY_TURN';
-            this.startEnemyTurn();
+            this.clearHighlights();
+            this.playerActionState = null;
+            this.events.emit('player_turn_ended');
+            this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
+            this.startNextTurn();
         }
 
-        startEnemyTurn() {
-            this.enemyTurnIndex = 0;
-            this.handleNextEnemy();
-        }
+        onActionSelected(move) {
+            this.playerActionState = move.type;
+            this.events.emit('player_action_selected');
 
-        handleNextEnemy() {
-            if (this.enemyTurnIndex >= this.enemies.length) {
-                this.endEnemyTurn();
-                return;
+            if (move.type === 'attack') {
+                this.highlightRange(this.player.gridPos, move.range, 0xff0000);
+                this.highlightAttackableEnemies(move.range);
+            } else if (move.type === 'move') {
+                this.highlightRange(this.player.gridPos, move.range, 0x0000ff);
             }
+        }
 
-            const currentEnemy = this.enemies[this.enemyTurnIndex];
-            this.takeEnemyTurn(currentEnemy, () => {
-                this.enemyTurnIndex++;
-                this.handleNextEnemy();
+        cancelPlayerAction() {
+            if (this.gameState === 'PLAYER_TURN' && this.playerActionState !== 'SELECTING_ACTION') {
+                this.clearHighlights();
+                this.playerActionState = 'SELECTING_ACTION';
+                this.events.emit('action_cancelled');
+            }
+        }
+        
+        highlightRange(startPos, range, color) {
+            this.clearHighlights();
+            const openList = [{ pos: startPos, cost: 0 }];
+            const closedList = new Set();
+            closedList.add(`${startPos.x},${startPos.y}`);
+            const highlights = [];
+
+            while (openList.length > 0) {
+                const current = openList.shift();
+                if (current.cost >= range) continue;
+                const neighbors = [
+                    { x: current.pos.x + 1, y: current.pos.y }, { x: current.pos.x - 1, y: current.pos.y },
+                    { x: current.pos.x, y: current.pos.y + 1 }, { x: current.pos.x, y: current.pos.y - 1 }
+                ];
+
+                for (const neighbor of neighbors) {
+                    const posKey = `${neighbor.x},${neighbor.y}`;
+                    if (closedList.has(posKey)) continue;
+
+                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE &&
+                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE &&
+                        this.grid[neighbor.y][neighbor.x] === 0) {
+                        
+                        closedList.add(posKey);
+                        openList.push({ pos: neighbor, cost: current.cost + 1 });
+
+                        const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH;
+                        const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT;
+                        const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.3);
+                        indicator.disableInteractive();
+                        indicator.setDepth(neighbor.x + neighbor.y + 0.5);
+                        highlights.push(indicator);
+                    }
+                }
+            }
+            this.rangeHighlights = highlights;
+        }
+
+        highlightAttackableEnemies(range) {
+            const enemies = this.units.filter(u => u !== this.player);
+            for (const enemy of enemies) {
+                const distance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+                if (distance <= range) {
+                    enemy.sprite.setTint(0xff0000);
+                }
+            }
+        }
+
+        clearHighlights() {
+            this.units.forEach(u => u.sprite.clearTint());
+            if (this.rangeHighlights) {
+                this.rangeHighlights.forEach(h => h.destroy());
+                this.rangeHighlights = [];
+            }
+        }
+
+        getUnitAtScreenPos(screenX, screenY) {
+            for (const unit of this.units) {
+                if (unit.sprite.getBounds().contains(screenX, screenY)) {
+                    return unit;
+                }
+            }
+            return null;
+        }
+
+        startEnemyTurn(enemy) {
+            this.gameState = 'ENEMY_TURN';
+            this.takeEnemyTurn(enemy, () => {
+                this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
+                this.startNextTurn();
             });
         }
 
-        endEnemyTurn() {
-            this.gameState = 'PLAYER_TURN';
-        }
-
         takeEnemyTurn(enemy, onTurnComplete) {
-            // Distance check
-            const dx = this.playerGridPos.x - enemy.gridPos.x;
-            const dy = this.playerGridPos.y - enemy.gridPos.y;
+            const dx = this.player.gridPos.x - enemy.gridPos.x;
+            const dy = this.player.gridPos.y - enemy.gridPos.y;
             const distance = Math.abs(dx) + Math.abs(dy);
 
-            if (distance <= 1) {
-                // Attack
-                if (enemy.sprite.anims.currentAnim.key !== 'orc_attack') {
-                    if (dx === -1 || dy === 1) { // Player is left-ish
-                        enemy.sprite.flipX = true;
-                    } else if (dx === 1 || dy === -1) { // Player is right-ish
-                        enemy.sprite.flipX = false;
-                    }
-                    enemy.sprite.play('orc_attack');
-                    enemy.sprite.once('animationcomplete', () => {
-                        enemy.sprite.play('orc_idle');
-                        onTurnComplete();
-                    });
-                } else {
-                    onTurnComplete();
-                }
+            if (distance <= enemy.moves.find(m => m.type === 'attack').range) {
+                enemy.attack(this.player);
+                this.time.delayedCall(500, onTurnComplete);
             } else {
-                // --- Find a valid target tile next to the player ---
                 const targetableTiles = [];
                 const neighbors = [
-                    { x: this.playerGridPos.x + 1, y: this.playerGridPos.y }, // East
-                    { x: this.playerGridPos.x - 1, y: this.playerGridPos.y }, // West
-                    { x: this.playerGridPos.x, y: this.playerGridPos.y + 1 }, // South
-                    { x: this.playerGridPos.x, y: this.playerGridPos.y - 1 }  // North
+                    { x: this.player.gridPos.x + 1, y: this.player.gridPos.y }, { x: this.player.gridPos.x - 1, y: this.player.gridPos.y },
+                    { x: this.player.gridPos.x, y: this.player.gridPos.y + 1 }, { x: this.player.gridPos.x, y: this.player.gridPos.y - 1 }
                 ];
 
                 for (const neighbor of neighbors) {
@@ -412,19 +422,19 @@
                         return distA - distB;
                     })[0];
 
-                    this.easystar.avoidAdditionalPoint(this.playerGridPos.x, this.playerGridPos.y);
+                    this.easystar.avoidAdditionalPoint(this.player.gridPos.x, this.player.gridPos.y);
                     this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
                         if (path && path.length > 1) {
-                            const truncatedPath = path.slice(0, Math.min(path.length, enemy.moveLimit + 1));
+                            const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
                             this.moveEnemyAlongPath(enemy, truncatedPath, onTurnComplete);
                         } else {
-                            onTurnComplete(); // No path found, end turn
+                            onTurnComplete();
                         }
                     });
                     this.easystar.calculate();
-                    this.easystar.stopAvoidingAdditionalPoint(this.playerGridPos.x, this.playerGridPos.y);
+                    this.easystar.stopAvoidingAdditionalPoint(this.player.gridPos.x, this.player.gridPos.y);
                 } else {
-                    onTurnComplete(); // No targetable tiles, end turn
+                    onTurnComplete();
                 }
             }
         }
@@ -439,11 +449,7 @@
             const tweens = [];
 
             for (let i = 1; i < path.length; i++) {
-                const prevPos = path[i - 1];
                 const nextPos = path[i];
-                const dx = nextPos.x - prevPos.x;
-                const dy = nextPos.y - prevPos.y;
-
                 const screenX = this.origin.x + (nextPos.x - nextPos.y) * this.mapConsts.HALF_WIDTH;
                 const screenY = this.origin.y + (nextPos.x + nextPos.y) * this.mapConsts.QUARTER_HEIGHT;
 
@@ -453,13 +459,15 @@
                     y: screenY - 16,
                     duration: 200,
                     onStart: () => {
+                        const prevPos = path[i-1];
+                        const dx = nextPos.x - prevPos.x;
+                        const dy = nextPos.y - prevPos.y;
                         if (dx === -1 || dy === 1) enemy.sprite.flipX = true;
                         else if (dx === 1 || dy === -1) enemy.sprite.flipX = false;
                     },
                     onComplete: () => {
                         enemy.gridPos.x = nextPos.x;
                         enemy.gridPos.y = nextPos.y;
-                        enemy.sprite.setDepth(9999998);
                     }
                 });
             }
@@ -471,5 +479,18 @@
                     if (onCompleteCallback) onCompleteCallback();
                 }
             });
+        }
+
+        onUnitDied(unit) {
+            const unitIndex = this.units.indexOf(unit);
+            if (unitIndex > -1) {
+                this.units.splice(unitIndex, 1);
+            }
+
+            this.buildTurnOrder();
+            if (this.turnIndex >= this.turnOrder.length) {
+                this.turnIndex = 0;
+            }
+            this.events.emit('turn_changed', this.turnIndex);
         }
     }
