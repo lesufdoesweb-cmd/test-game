@@ -83,9 +83,9 @@ export class Unit {
 
         // Emit particles event
         if (attacker) {
-            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y, attacker.sprite.x, attacker.sprite.y);
+            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y, attacker, this);
         } else {
-            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y);
+            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y, null, this);
         }
 
         if (this.stats.currentHealth === 0) {

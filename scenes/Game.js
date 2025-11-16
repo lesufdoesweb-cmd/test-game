@@ -1,6 +1,6 @@
-    import ASSETS from '../assets.js';
-import { Unit } from '../gameObjects/Unit.js';
-import { level1 } from '../levels/level1.js';
+import ASSETS from '../assets.js';
+import {Unit} from '../gameObjects/Unit.js';
+import {level1} from '../levels/level1.js';
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -147,30 +147,68 @@ export class Game extends Phaser.Scene {
             this.events.on('action_cancelled', this.cancelPlayerAction, this);
 
             // --- Particle Effects ---
-            const particleGraphics = this.add.graphics();
-            particleGraphics.fillStyle(0xffffff);
-            particleGraphics.fillRect(0, 0, 1, 1);
-            particleGraphics.generateTexture('particle', 1, 1);
-            particleGraphics.destroy();
+            const particleG = this.add.graphics();
+            particleG.fillStyle(0xffffff);
+            particleG.fillRect(0, 0, 1, 1);
+            particleG.generateTexture('particle', 1, 1);
+            particleG.destroy();
 
-            this.bloodEmitter = this.add.particles(0, 0, 'particle', {
-                speed: { min: -150, max: 150 },
-                angle: { min: 0, max: 180 },
-                scale: { start: 3, end: 0 },
-                blendMode: 'NORMAL',
-                lifespan: 400,
-                gravityY: 300,
+
+        this.events.on('unit_damaged', (x, y, attacker, target) => {
+
+            // compute angle config (default omni)
+            let angleCfg = { min: 0, max: 360 };
+
+            // Preferred: attacker/target are Unit objects with gridPos
+            if (attacker && target && attacker.gridPos && target.gridPos) {
+                const dx = target.gridPos.x - attacker.gridPos.x;
+                const dy = target.gridPos.y - attacker.gridPos.y;
+                const splashAngle = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+                angleCfg = { min: splashAngle - 25, max: splashAngle + 25 };
+            }
+            // Fallback: if attacker/target were passed as numbers (coords)
+            else if (typeof attacker === 'number' && typeof target === 'number') {
+                const dx = x - attacker;
+                const dy = y - target;
+                const angleDeg = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+                const splashAngle = angleDeg + 180;
+                angleCfg = { min: splashAngle - 25, max: splashAngle + 25 };
+            }
+
+            // Create a ONE-SHOT emitter at the hit location with the chosen angle range.
+            // Note: in Phaser >= 3.60 the call signature is this.add.particles(x, y, key, config)
+            const emitter = this.add.particles(x, y, 'particle', {
+                angle: angleCfg,
+                speed: { min: 150, max: 300 },
+                scale: { start: 4, end: 0 },
+                lifespan: 500,
+                gravityY: 400,
+                alpha: { start: 1, end: 0 },
                 tint: 0xff0000,
-            });
-            this.bloodEmitter.setDepth(10000);
-            this.bloodEmitter.stop();
-
-            this.events.on('unit_damaged', (x, y) => {
-                this.bloodEmitter.setPosition(x, y);
-                this.bloodEmitter.explode(30);
+                emitting: false   // we'll trigger with explode()
             });
 
-            this.input.on('pointerdown', (pointer, gameObjects) => {
+            emitter.setDepth(99999999);
+            // explode immediately (one shot)
+            if (emitter && emitter.explode) {
+                emitter.explode(30); // emit 30 particles
+            }
+
+            // schedule emitter cleanup after particles finish
+            this.time.delayedCall(700, () => {
+                try { emitter.stop(); } catch (e) {}
+                if (emitter && emitter.destroy) emitter.destroy();
+            });
+
+            // camera shake only when the player is hit
+            if (target === this.player) {
+                this.cameras.main.shake(120, 0.0005);
+            }
+        });
+
+
+
+        this.input.on('pointerdown', (pointer, gameObjects) => {
                 if (pointer.rightButtonDown()) {
                     this.cancelPlayerAction();
                     return;
