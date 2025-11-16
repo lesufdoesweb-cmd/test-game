@@ -155,9 +155,9 @@ export class Game extends Phaser.Scene {
 
             this.bloodEmitter = this.add.particles(0, 0, 'particle', {
                 speed: { min: -150, max: 150 },
-                angle: { min: 0, max: 360 },
+                angle: { min: 0, max: 180 },
                 scale: { start: 3, end: 0 },
-                blendMode: 'ADD',
+                blendMode: 'NORMAL',
                 lifespan: 400,
                 gravityY: 300,
                 tint: 0xff0000,

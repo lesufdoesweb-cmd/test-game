@@ -71,10 +71,10 @@ export class Unit {
         console.log(`${this.name} attacks ${target.name}`);
         // In a real game, you'd play an attack animation here
         // this.sprite.play('knight_attack');
-        target.takeDamage(this.stats.physicalDamage);
+        target.takeDamage(this.stats.physicalDamage, this);
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attacker = null) {
         this.stats.currentHealth -= amount;
         if (this.stats.currentHealth < 0) {
             this.stats.currentHealth = 0;
@@ -82,7 +82,11 @@ export class Unit {
         this.updateHealthBar();
 
         // Emit particles event
-        this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y);
+        if (attacker) {
+            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y, attacker.sprite.x, attacker.sprite.y);
+        } else {
+            this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y);
+        }
 
         if (this.stats.currentHealth === 0) {
             this.die();
