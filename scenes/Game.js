@@ -146,6 +146,30 @@ export class Game extends Phaser.Scene {
             this.events.on('unit_died', this.onUnitDied, this);
             this.events.on('action_cancelled', this.cancelPlayerAction, this);
 
+            // --- Particle Effects ---
+            const particleGraphics = this.add.graphics();
+            particleGraphics.fillStyle(0xffffff);
+            particleGraphics.fillRect(0, 0, 1, 1);
+            particleGraphics.generateTexture('particle', 1, 1);
+            particleGraphics.destroy();
+
+            this.bloodEmitter = this.add.particles(0, 0, 'particle', {
+                speed: { min: -150, max: 150 },
+                angle: { min: 0, max: 360 },
+                scale: { start: 3, end: 0 },
+                blendMode: 'ADD',
+                lifespan: 400,
+                gravityY: 300,
+                tint: 0xff0000,
+            });
+            this.bloodEmitter.setDepth(10000);
+            this.bloodEmitter.stop();
+
+            this.events.on('unit_damaged', (x, y) => {
+                this.bloodEmitter.setPosition(x, y);
+                this.bloodEmitter.explode(30);
+            });
+
             this.input.on('pointerdown', (pointer, gameObjects) => {
                 if (pointer.rightButtonDown()) {
                     this.cancelPlayerAction();
@@ -398,8 +422,25 @@ export class Game extends Phaser.Scene {
             const distance = Math.abs(dx) + Math.abs(dy);
 
             if (distance <= enemy.moves.find(m => m.type === 'attack').range) {
-                enemy.attack(this.player);
-                this.time.delayedCall(500, onTurnComplete);
+                // Attack
+                if (enemy.sprite.anims.currentAnim.key !== 'orc_attack') {
+                    // Flip sprite to face player
+                    if (dx < 0 || (dx === 0 && dy < 0)) { // Player is left-ish or directly up
+                        enemy.sprite.flipX = true;
+                    } else { // Player is right-ish or directly down
+                        enemy.sprite.flipX = false;
+                    }
+
+                    enemy.sprite.play('orc_attack');
+                    enemy.sprite.once('animationcomplete', () => {
+                        enemy.attack(this.player); // Apply damage AFTER animation
+                        enemy.sprite.play('orc_idle'); // Return to idle
+                        onTurnComplete(); // End the turn
+                    });
+                } else {
+                    // If attack is already playing, just end the turn to avoid getting stuck
+                    onTurnComplete();
+                }
             } else {
                 const targetableTiles = [];
                 const neighbors = [

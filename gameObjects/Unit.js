@@ -81,6 +81,9 @@ export class Unit {
         }
         this.updateHealthBar();
 
+        // Emit particles event
+        this.scene.events.emit('unit_damaged', this.sprite.x, this.sprite.y);
+
         if (this.stats.currentHealth === 0) {
             this.die();
         }
