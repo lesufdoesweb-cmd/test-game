@@ -1,6 +1,7 @@
 import ASSETS from '../assets.js';
 import {Unit} from '../gameObjects/Unit.js';
-import {level1} from '../levels/level1.js';
+import {level1Config} from '../levels/level1_config.js';
+import {LevelGenerator} from "../LevelGenerator.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -11,7 +12,8 @@ export class Game extends Phaser.Scene {
         this.grid = [];
         this.origin = { x: 0, y: 0 };
         this.mapConsts = {
-            MAP_SIZE: 9,
+            MAP_SIZE_X: 0,
+            MAP_SIZE_Y: 0,
             TILE_WIDTH: 31,
             HALF_WIDTH: 0,
             QUARTER_HEIGHT: 0,
@@ -24,31 +26,40 @@ export class Game extends Phaser.Scene {
     }
 
     create() {
+        const levelData = LevelGenerator.generate(level1Config);
+
         this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
         this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
+        this.mapConsts.MAP_SIZE_X = levelData.mapSize.width;
+        this.mapConsts.MAP_SIZE_Y = levelData.mapSize.height;
 
         this.origin.x = this.scale.width / 2;
         this.origin.y = this.scale.height / 2 - 100;
 
         // --- Level Setup from Config ---
         this.easystar = new EasyStar.js();
-        this.grid = level1.layout;
+        this.grid = levelData.layout;
         this.easystar.setGrid(this.grid);
-        this.easystar.setAcceptableTiles([0]);
+        const walkableTiles = Object.keys(levelData.tileset)
+            .filter(k => levelData.tileset[k].type === 'walkable' || levelData.tileset[k].type === 'bridge')
+            .map(k => parseInt(k));
+        this.walkableTiles = walkableTiles;
+        this.easystar.setAcceptableTiles(walkableTiles);
+
 
         // --- Map Rendering ---
-        for (let gridY = 0; gridY < this.grid.length; gridY++) {
-            for (let gridX = 0; gridX < this.grid[gridY].length; gridX++) {
+        for (let gridY = 0; gridY < this.mapConsts.MAP_SIZE_Y; gridY++) {
+            for (let gridX = 0; gridX < this.mapConsts.MAP_SIZE_X; gridX++) {
                 const tileType = this.grid[gridY][gridX];
+                if (tileType === -1) continue; // Skip void tiles
+
                 const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
                 const screenY = this.origin.y + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
 
-                const tile = this.add.image(screenX, screenY, ASSETS.image.forest_tiles.key);
-                tile.setDepth(gridX + gridY);
-
-                if (tileType === 1) {
-                    const rock = this.add.image(screenX, screenY - 8, ASSETS.image.rock_tile.key);
-                    rock.setDepth(gridX + gridY + 0.1);
+                const tileInfo = levelData.tileset[tileType];
+                if (tileInfo) {
+                    const tile = this.add.image(screenX, screenY, ASSETS.image[tileInfo.assetKey].key);
+                    tile.setDepth(gridX + gridY);
                 }
 
                 const interactiveZone = this.add.zone(screenX + 8, screenY, this.mapConsts.TILE_WIDTH, this.mapConsts.TILE_WIDTH / 2);
@@ -66,7 +77,7 @@ export class Game extends Phaser.Scene {
         }
 
         // --- Unit Creation from Config ---
-        const playerStartPos = level1.playerStart;
+        const playerStartPos = levelData.playerStart;
         this.player = new Unit(this, {
             gridX: playerStartPos.x,
             gridY: playerStartPos.y,
@@ -77,7 +88,7 @@ export class Game extends Phaser.Scene {
         });
         this.units.push(this.player);
 
-        level1.enemies.forEach(enemyInfo => {
+        levelData.enemies.forEach(enemyInfo => {
             if (enemyInfo.type === 'Orc') {
                 const orc = new Unit(this, {
                     gridX: enemyInfo.pos.x,
@@ -133,7 +144,7 @@ export class Game extends Phaser.Scene {
 
             // --- Camera and Input ---
             this.cameras.main.setZoom(3);
-            this.cameras.main.centerOn(this.origin.x, this.origin.y + this.mapConsts.MAP_SIZE * this.mapConsts.QUARTER_HEIGHT);
+            this.cameras.main.centerOn(this.origin.x, this.origin.y);
 
             // --- Start Game ---
             this.buildTurnOrder();
@@ -241,7 +252,10 @@ export class Game extends Phaser.Scene {
                         move.currentCooldown = move.cooldown;
                         this.player.usedStandardAction = true;
                         this.player.attack(targetUnit);
-                        this.cancelPlayerAction();
+                        
+                        this.clearHighlights();
+                        this.playerActionState = 'SELECTING_ACTION';
+                        this.events.emit('player_action_completed');
                     }
                 }
             });
@@ -253,8 +267,7 @@ export class Game extends Phaser.Scene {
                     cam.scrollY -= (pointer.y - pointer.prevPosition.y) / cam.zoom;
                 }
             });
-        }
-
+    }
         update(time, delta) {
             this.units.forEach(u => u.update());
         }
@@ -348,7 +361,7 @@ export class Game extends Phaser.Scene {
                         const move = this.player.moves.find(m => m.type === 'move');
                         move.currentCooldown = move.cooldown;
                         this.player.hasMoved = true;
-                        this.events.emit('action_cancelled');
+                        this.events.emit('player_action_completed');
                     }
                 }
             });
@@ -456,9 +469,9 @@ export class Game extends Phaser.Scene {
 
                     if (enemyPositions.has(posKey)) continue;
 
-                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE &&
-                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE &&
-                        this.grid[neighbor.y][neighbor.x] === 0) {
+                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
+                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
+                        this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x])) {
 
                         closedList.add(posKey);
                         openList.push({ pos: neighbor, cost: current.cost + 1 });
@@ -544,9 +557,9 @@ export class Game extends Phaser.Scene {
                 ];
 
                 for (const neighbor of neighbors) {
-                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE &&
-                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE &&
-                        this.grid[neighbor.y][neighbor.x] === 0) {
+                    if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
+                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
+                        this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x])) {
                         targetableTiles.push(neighbor);
                     }
                 }
