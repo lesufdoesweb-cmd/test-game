@@ -1,5 +1,4 @@
 import ASSETS from "../assets.js";
-import { Tooltip } from "../ui/Tooltip.js";
 
 export class ActionUI extends Phaser.Scene {
     constructor() {
@@ -12,6 +11,7 @@ export class ActionUI extends Phaser.Scene {
         this.cancelActionButton = null;
         this.apText = null;
         this.actionBar = null;
+        this.tooltipContainer = null;
     }
 
     create() {
@@ -69,6 +69,69 @@ export class ActionUI extends Phaser.Scene {
             }
             this.draggingKey = null;
         });
+    }
+
+    showTooltip(content, anchorX, anchorY) {
+        if (this.tooltipContainer) {
+            this.hideTooltip();
+        }
+
+        const textObject = this.add.text(0, 0, content, {
+            fontSize: '14px',
+            fill: '#fff',
+            wordWrap: { width: 150 }
+        });
+
+        const padding = 8;
+        const textWidth = textObject.width;
+        const textHeight = textObject.height;
+        const tooltipWidth = textWidth + padding * 2;
+        const tooltipHeight = textHeight + padding * 2;
+
+        textObject.setPosition(padding, padding);
+
+        const background = this.add.graphics();
+        background.fillStyle(0x111111, 0.9);
+        background.fillRoundedRect(0, 0, tooltipWidth, tooltipHeight, 5);
+        background.lineStyle(1, 0xeeeeee, 0.9);
+        background.strokeRoundedRect(0, 0, tooltipWidth, tooltipHeight, 5);
+
+        const sceneWidth = this.scale.width;
+        const sceneHeight = this.scale.height;
+        let newX = anchorX - tooltipWidth;
+        let newY = anchorY - tooltipHeight - 5;
+
+        if (newY < 0) {
+            newY = anchorY + 5;
+        }
+        if (newX < 0) {
+            newX = 0;
+        }
+        if (newY + tooltipHeight > sceneHeight) {
+            newY = sceneHeight - tooltipHeight;
+        }
+
+        this.tooltipContainer = this.add.container(newX, newY);
+        this.tooltipContainer.add([background, textObject]);
+        this.tooltipContainer.setDepth(30000);
+    }
+
+    hideTooltip() {
+        if (this.tooltipContainer) {
+            this.tooltipContainer.destroy();
+            this.tooltipContainer = null;
+        }
+    }
+    
+    showGameTooltip(content, worldX, worldY, worldWidth, worldHeight) {
+        const cam = this.gameScene.cameras.main;
+        const screenX = (worldX - cam.worldView.x) * cam.zoom;
+        const screenY = (worldY - cam.worldView.y) * cam.zoom;
+        this.showTooltip(content, screenX, screenY);
+    }
+
+    hideGameTooltip() {
+        this.hideTooltip();
     }
 
     createActionBar() {
@@ -180,19 +243,13 @@ export class ActionUI extends Phaser.Scene {
             });
 
             icon.on('pointerover', () => {
-                const playerStatsUI = this.scene.get('PlayerStatsUI');
-                if (!playerStatsUI) return;
-
                 const move = ability.moveData;
                 const abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}\nCooldown: ${move.cooldown}`;
-                
-                playerStatsUI.showAbilityTooltip(abilityText, icon.x, icon.y, icon.displayWidth, icon.displayHeight);
+                this.showTooltip(abilityText, icon.x, icon.y);
             });
     
             icon.on('pointerout', () => {
-                const playerStatsUI = this.scene.get('PlayerStatsUI');
-                if (!playerStatsUI) return;
-                playerStatsUI.hideAbilityTooltip();
+                this.hideTooltip();
             });
 
         } else {
@@ -205,7 +262,6 @@ export class ActionUI extends Phaser.Scene {
                     strokeThickness: 4
                 }).setOrigin(0.5, 0.5).setDepth(10002);
                 
-                // Add the text to a temporary list to be cleaned up
                 if (!this.cooldownTexts) this.cooldownTexts = [];
                 this.cooldownTexts.push(cooldownText);
             }

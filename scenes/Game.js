@@ -5,8 +5,6 @@ import {LevelGenerator} from "../LevelGenerator.js";
 import { Obstacle } from '../gameObjects/Obstacle.js';
 import { Chest } from '../gameObjects/Chest.js';
 import { NPC } from '../gameObjects/NPC.js';
-import { Tooltip } from '../ui/Tooltip.js';
-import { PlayerStatsUI } from './PlayerStatsUI.js';
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -726,19 +724,19 @@ export class Game extends Phaser.Scene {
             unit.sprite.setInteractive({ useHandCursor: true });
 
             unit.sprite.on('pointerover', () => {
-                const playerStatsUI = this.scene.get('PlayerStatsUI');
-                if (!playerStatsUI) return;
+                const actionUI = this.scene.get('ActionUI');
+                if (!actionUI) return;
 
                 const stats = unit.stats;
                 const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
                 
-                playerStatsUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
+                actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
             });
 
             unit.sprite.on('pointerout', () => {
-                const playerStatsUI = this.scene.get('PlayerStatsUI');
-                if (!playerStatsUI) return;
-                playerStatsUI.hideGameTooltip();
+                const actionUI = this.scene.get('ActionUI');
+                if (!actionUI) return;
+                actionUI.hideGameTooltip();
             });
         }
     }
