@@ -5,6 +5,9 @@ import { ActionUI } from "./scenes/ActionUI.js";
 import { Preloader } from "./scenes/Preloader.js";
 import { GameOver } from "./scenes/GameOver.js";
 import { Background } from "./scenes/Background.js";
+import { MainMenu } from "./scenes/MainMenu.js";
+import { LevelSelector } from "./scenes/LevelSelector.js";
+import { LevelEditor } from "./scenes/LevelEditor.js";
 
 const config = {
     type: Phaser.AUTO,
@@ -15,7 +18,7 @@ const config = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [Preloader, Background, Game, TimelineUI, ActionUI, GameOver],
+    scene: [Preloader, Background, Game, TimelineUI, ActionUI, GameOver, MainMenu, LevelSelector, LevelEditor],
     render: {
         pixelArt: true,
         antialias: false

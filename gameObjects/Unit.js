@@ -31,7 +31,7 @@ export class Unit {
         const screenY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
 
         this.sprite = scene.add.sprite(screenX, screenY - 16, texture, frame);
-        this.sprite.setDepth(9999);
+        this.sprite.setDepth(screenY);
 
         this.healthBar = null;
         this.createHealthBar();
@@ -46,7 +46,7 @@ export class Unit {
         if (!this.healthBar) return;
 
         this.healthBar.clear();
-        this.healthBar.setDepth(99999);
+        this.healthBar.setDepth(this.sprite.depth + 1);
 
         const width = 24;
         const height = 4;
@@ -70,6 +70,7 @@ export class Unit {
 
     update() {
         // This method will be called from the main game update loop
+        this.sprite.setDepth(this.sprite.y + 16);
         this.updateHealthBar();
     }
 
@@ -86,6 +87,7 @@ export class Unit {
             this.stats.currentHealth = 0;
         }
         this.updateHealthBar();
+        this.scene.events.emit('unit_stats_changed', this);
 
         // Emit particles event
         if (attacker) {

@@ -4,69 +4,55 @@ export class MainMenu extends Phaser.Scene {
     }
 
     create() {
-        const centreX = this.scale.width * 0.5;
-        const centreY = this.scale.height * 0.5;
+        const { width, height } = this.scale;
 
-        this.add.text(centreX, centreY - 100, 'Main Menu', {
-            fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
+        this.add.text(width / 2, height / 4, 'One More Run', {
+            fontSize: '48px',
+            fill: '#ffffff'
         }).setOrigin(0.5);
 
-        const startButton = this.add.text(centreX, centreY, 'Start Game', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setInteractive();
+        // Start Game Button
+        const startGameButton = this.add.text(width / 2, height / 2, 'Start Game', {
+            fontSize: '32px',
+            fill: '#0f0'
+        })
+        .setOrigin(0.5)
+        .setInteractive();
 
-        const optionsButton = this.add.text(centreX, centreY + 100, 'Options', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setInteractive();
-
-        const exitButton = this.add.text(centreX, centreY + 200, 'Exit', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setInteractive();
-
-        startButton.on('pointerover', () => {
-            startButton.setStyle({ fill: '#ff0' });
+        startGameButton.on('pointerdown', () => {
+            this.scene.start('LevelSelector');
         });
+        startGameButton.on('pointerover', () => startGameButton.setStyle({ fill: '#ff0'}));
+        startGameButton.on('pointerout', () => startGameButton.setStyle({ fill: '#0f0'}));
 
-        startButton.on('pointerout', () => {
-            startButton.setStyle({ fill: '#fff' });
-        });
 
-        startButton.on('pointerdown', () => {
-            this.scene.start('Game');
-        });
+        // Level Selector Button
+        const levelSelectorButton = this.add.text(width / 2, height / 2 + 70, 'Level Selector', {
+            fontSize: '32px',
+            fill: '#0f0'
+        })
+        .setOrigin(0.5)
+        .setInteractive();
 
-        optionsButton.on('pointerover', () => {
-            optionsButton.setStyle({ fill: '#ff0' });
+        levelSelectorButton.on('pointerdown', () => {
+            this.scene.start('LevelSelector');
         });
+        levelSelectorButton.on('pointerover', () => levelSelectorButton.setStyle({ fill: '#ff0'}));
+        levelSelectorButton.on('pointerout', () => levelSelectorButton.setStyle({ fill: '#0f0'}));
 
-        optionsButton.on('pointerout', () => {
-            optionsButton.setStyle({ fill: '#fff' });
-        });
 
-        optionsButton.on('pointerdown', () => {
-            this.scene.start('Options');
-        });
+        // Level Editor Button
+        const levelEditorButton = this.add.text(width / 2, height / 2 + 140, 'Level Editor', {
+            fontSize: '32px',
+            fill: '#0f0'
+        })
+        .setOrigin(0.5)
+        .setInteractive();
 
-        exitButton.on('pointerover', () => {
-            exitButton.setStyle({ fill: '#ff0' });
+        levelEditorButton.on('pointerdown', () => {
+            this.scene.start('LevelEditor');
         });
-
-        exitButton.on('pointerout', () => {
-            exitButton.setStyle({ fill: '#fff' });
-        });
-
-        exitButton.on('pointerdown', () => {
-            // In a real game, you'd want to close the window.
-            // For a browser game, this is not possible, so we'll just log it.
-            console.log('Exit button clicked');
-        });
+        levelEditorButton.on('pointerover', () => levelEditorButton.setStyle({ fill: '#ff0'}));
+        levelEditorButton.on('pointerout', () => levelEditorButton.setStyle({ fill: '#0f0'}));
     }
 }

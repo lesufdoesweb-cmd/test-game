@@ -2,6 +2,11 @@ import ASSETS from '../assets.js';
 import {Unit} from '../gameObjects/Unit.js';
 import {level1Config} from '../levels/level1_config.js';
 import {LevelGenerator} from "../LevelGenerator.js";
+import { Obstacle } from '../gameObjects/Obstacle.js';
+import { Chest } from '../gameObjects/Chest.js';
+import { NPC } from '../gameObjects/NPC.js';
+import { Tooltip } from '../ui/Tooltip.js';
+import { PlayerStatsUI } from './PlayerStatsUI.js';
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -25,8 +30,9 @@ export class Game extends Phaser.Scene {
         this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
     }
 
-    create() {
-        const levelData = LevelGenerator.generate(level1Config);
+    create(data) {
+        const levelConfig = data.levelConfig || level1Config;
+        const levelData = LevelGenerator.generate(levelConfig);
 
         this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
         this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
@@ -76,29 +82,66 @@ export class Game extends Phaser.Scene {
             }
         }
 
-        // --- Unit Creation from Config ---
-        const playerStartPos = levelData.playerStart;
-        this.player = new Unit(this, {
-            gridX: playerStartPos.x,
-            gridY: playerStartPos.y,
-            texture: ASSETS.spritesheet.basic_unit.key,
-            frame: 0,
-            name: 'Knight',
-            stats: { maxHealth: 120, currentHealth: 120, moveRange: 4, physicalDamage: 25, speed: 10 }
-        });
-        this.units.push(this.player);
+        // --- Object Creation from Config ---
+        levelData.objects.forEach(obj => {
+            const screenX = this.origin.x + (obj.position.x - obj.position.y) * this.mapConsts.HALF_WIDTH;
+            const screenY = this.origin.y + (obj.position.x + obj.position.y) * this.mapConsts.QUARTER_HEIGHT;
 
-        levelData.enemies.forEach(enemyInfo => {
-            if (enemyInfo.type === 'Orc') {
-                const orc = new Unit(this, {
-                    gridX: enemyInfo.pos.x,
-                    gridY: enemyInfo.pos.y,
-                    texture: ASSETS.spritesheet.basic_unit.key,
-                    frame: 26,
-                    name: 'Orc',
-                    stats: { maxHealth: 80, currentHealth: 80, moveRange: 3, physicalDamage: 35, speed: 12 }
-                });
-                this.units.push(orc);
+            switch (obj.type) {
+                case 'player_start':
+                    this.player = new Unit(this, {
+                        gridX: obj.position.x,
+                        gridY: obj.position.y,
+                        texture: ASSETS.spritesheet.basic_unit.key,
+                        frame: 0,
+                        name: 'Knight',
+                        stats: { maxHealth: 120, currentHealth: 120, moveRange: 4, physicalDamage: 25, speed: 10 }
+                    });
+                    this.units.push(this.player);
+                    this.makeUnitInteractive(this.player);
+                    break;
+                case 'enemy':
+                    if (obj.enemyType === 'Orc') {
+                        const orc = new Unit(this, {
+                            gridX: obj.position.x,
+                            gridY: obj.position.y,
+                            texture: ASSETS.spritesheet.basic_unit.key,
+                            frame: 26,
+                            name: 'Orc',
+                            stats: { maxHealth: 80, currentHealth: 80, moveRange: 3, physicalDamage: 35, speed: 12 }
+                        });
+                        this.units.push(orc);
+                        this.makeUnitInteractive(orc);
+                    }
+                    break;
+                case 'obstacle':
+                    new Obstacle(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.image.obstacle_tree.key,
+                        depth: screenY
+                    });
+                    break;
+                case 'chest':
+                    new Chest(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.spritesheet.items.key,
+                        frame: 0,
+                        depth: screenY,
+                        items: obj.items
+                    });
+                    break;
+                case 'npc':
+                    new NPC(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.spritesheet.npc.key,
+                        frame: 0,
+                        depth: screenY,
+                        npcType: obj.npcType
+                    });
+                    break;
             }
         });
 
@@ -150,9 +193,15 @@ export class Game extends Phaser.Scene {
             this.buildTurnOrder();
             this.scene.launch('TimelineUI', { turnOrder: this.turnOrder });
             this.scene.launch('ActionUI');
+            this.scene.launch('PlayerStatsUI');
             this.startNextTurn();
 
             // --- Event Listeners ---
+            this.events.on('unit_stats_changed', (unit) => {
+                if (unit === this.player) {
+                    this.events.emit('player_stats_changed', unit);
+                }
+            });
             this.events.on('action_selected', this.onActionSelected, this);
             this.events.on('unit_died', this.onUnitDied, this);
             this.events.on('action_cancelled', this.cancelPlayerAction, this);
@@ -249,6 +298,7 @@ export class Game extends Phaser.Scene {
                     if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
                         const move = this.player.moves.find(m => m.type === this.playerActionState);
                         this.player.stats.currentAp -= move.cost;
+                        this.events.emit('unit_stats_changed', this.player);
                         move.currentCooldown = move.cooldown;
                         this.player.usedStandardAction = true;
                         this.player.attack(targetUnit);
@@ -359,9 +409,12 @@ export class Game extends Phaser.Scene {
                     unit.sprite.play(unit.name.toLowerCase() + '_idle');
                     if (unit === this.player) {
                         const move = this.player.moves.find(m => m.type === 'move');
+                        this.player.stats.currentAp -= move.cost;
                         move.currentCooldown = move.cooldown;
                         this.player.hasMoved = true;
+                        this.events.emit('unit_stats_changed', this.player);
                         this.events.emit('player_action_completed');
+                        this.playerActionState = 'SELECTING_ACTION';
                     }
                 }
             });
@@ -401,6 +454,7 @@ export class Game extends Phaser.Scene {
             this.player.stats.currentAp = this.player.stats.maxAp;
             this.player.hasMoved = false;
             this.player.usedStandardAction = false;
+            this.events.emit('unit_stats_changed', this.player);
             this.events.emit('player_turn_started', this.player);
         }
 
@@ -556,10 +610,13 @@ export class Game extends Phaser.Scene {
                     { x: this.player.gridPos.x, y: this.player.gridPos.y + 1 }, { x: this.player.gridPos.x, y: this.player.gridPos.y - 1 }
                 ];
 
+                const occupiedPositions = new Set(this.units.map(u => `${u.gridPos.x},${u.gridPos.y}`));
+
                 for (const neighbor of neighbors) {
                     if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
                         neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
-                        this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x])) {
+                        this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x]) &&
+                        !occupiedPositions.has(`${neighbor.x},${neighbor.y}`)) {
                         targetableTiles.push(neighbor);
                     }
                 }
@@ -571,7 +628,11 @@ export class Game extends Phaser.Scene {
                         return distA - distB;
                     })[0];
 
-                    this.easystar.avoidAdditionalPoint(this.player.gridPos.x, this.player.gridPos.y);
+                    this.units.forEach(unit => {
+                        if (unit !== enemy) {
+                            this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                        }
+                    });
                     this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
                         if (path && path.length > 1) {
                             const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
@@ -586,9 +647,13 @@ export class Game extends Phaser.Scene {
                         } else {
                             onTurnComplete();
                         }
+                        this.units.forEach(unit => {
+                            if (unit !== enemy) {
+                                this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                            }
+                        });
                     });
                     this.easystar.calculate();
-                    this.easystar.stopAvoidingAdditionalPoint(this.player.gridPos.x, this.player.gridPos.y);
                 } else {
                     onTurnComplete();
                 }
@@ -655,5 +720,25 @@ export class Game extends Phaser.Scene {
                 this.turnIndex = 0;
             }
             this.events.emit('turn_changed', this.turnIndex);
+        }
+
+        makeUnitInteractive(unit) {
+            unit.sprite.setInteractive({ useHandCursor: true });
+
+            unit.sprite.on('pointerover', () => {
+                const playerStatsUI = this.scene.get('PlayerStatsUI');
+                if (!playerStatsUI) return;
+
+                const stats = unit.stats;
+                const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
+                
+                playerStatsUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
+            });
+
+            unit.sprite.on('pointerout', () => {
+                const playerStatsUI = this.scene.get('PlayerStatsUI');
+                if (!playerStatsUI) return;
+                playerStatsUI.hideGameTooltip();
+            });
         }
     }

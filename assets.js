@@ -18,12 +18,26 @@ export default {
             key: 'forest_tiles',
             args: ['src/assets/sprites/terrain/forest_tile.png']
         },
-        rock_tile: {
-            key: 'rock_tile',
+        obstacle_tree: {
+            key: 'obstacle_tree',
             args: ['src/assets/sprites/terrain/forest.png']
         }
     },
     'spritesheet': {
+        items: {
+            key: 'items',
+            args: ['src/assets/sprites/units/items.png', {
+                frameWidth: 32,
+                frameHeight: 32,
+            }]
+        },
+        npc: {
+            key: 'npc',
+            args: ['src/assets/sprites/units/base_unit.png', {
+                frameWidth: 32,
+                frameHeight: 32,
+            }]
+        },
         ability_atlas: {
             key: 'ability_atlas',
             args: ['src/assets/sprites/ui/ability_atlas.png', {

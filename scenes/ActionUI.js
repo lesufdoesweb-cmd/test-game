@@ -1,4 +1,5 @@
 import ASSETS from "../assets.js";
+import { Tooltip } from "../ui/Tooltip.js";
 
 export class ActionUI extends Phaser.Scene {
     constructor() {
@@ -169,7 +170,7 @@ export class ActionUI extends Phaser.Scene {
             .setScale(scale);
 
         if (isEnabled) {
-            icon.setInteractive();
+            icon.setInteractive({useHandCursor: true});
             this.input.setDraggable(icon);
             icon.setData('isDraggable', true);
             icon.on('pointerdown', (pointer) => {
@@ -177,6 +178,23 @@ export class ActionUI extends Phaser.Scene {
                     this.gameScene.events.emit('action_selected', ability.moveData);
                 }
             });
+
+            icon.on('pointerover', () => {
+                const playerStatsUI = this.scene.get('PlayerStatsUI');
+                if (!playerStatsUI) return;
+
+                const move = ability.moveData;
+                const abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}\nCooldown: ${move.cooldown}`;
+                
+                playerStatsUI.showAbilityTooltip(abilityText, icon.x, icon.y, icon.displayWidth, icon.displayHeight);
+            });
+    
+            icon.on('pointerout', () => {
+                const playerStatsUI = this.scene.get('PlayerStatsUI');
+                if (!playerStatsUI) return;
+                playerStatsUI.hideAbilityTooltip();
+            });
+
         } else {
             icon.setTint(0x808080);
             if (move.currentCooldown > 0) {
