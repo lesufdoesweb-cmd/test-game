@@ -24,20 +24,17 @@ export default {
         },
         ui_button: {
             key: 'ui_button',
-            args: ['assets/ui/button.png']
+            args: ['src/assets/ui/button.png']
+        },
+        npc: {
+            key: 'npc',
+            args: ['src/assets/sprites/units/base_unit.png']
         }
     },
     'spritesheet': {
         items: {
             key: 'items',
             args: ['src/assets/sprites/units/items.png', {
-                frameWidth: 32,
-                frameHeight: 32,
-            }]
-        },
-        npc: {
-            key: 'npc',
-            args: ['src/assets/sprites/units/base_unit.png', {
                 frameWidth: 32,
                 frameHeight: 32,
             }]
@@ -56,20 +53,6 @@ export default {
             args: ['src/assets/sprites/units/basic_units.png', {
                 frameWidth: 32,
                 frameHeight: 32,
-            }]
-        },
-        ships: {
-            key: 'ships',
-            args: ['assets/ships.png', {
-                frameWidth: 64,
-                frameHeight: 64,
-            }]
-        },
-        tiles: {
-            key: 'tiles',
-            args: ['assets/tiles.png', {
-                frameWidth: 32,
-                frameHeight: 32
             }]
         },
     }
