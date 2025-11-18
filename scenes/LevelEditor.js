@@ -1,4 +1,5 @@
 import { level1Config } from '../levels/level1_config.js'; // Used for tileset copy
+import { NineSliceButton } from '../ui/NineSliceButton.js';
 
 export class LevelEditor extends Phaser.Scene {
     constructor() {
@@ -68,31 +69,24 @@ export class LevelEditor extends Phaser.Scene {
         this.createPaletteUI();
         this.createSaveLoadUI();
     }
-    
-    createButton(x, y, text, onClick) {
-        const button = this.add.text(x, y, text, {
-            fontSize: '16px', backgroundColor: '#333', padding: { x: 8, y: 4 }
-        }).setInteractive({ useHandCursor: true }).setOrigin(0.5);
-
-        button.on('pointerdown', onClick);
-        return button;
-    }
 
     createPaletteUI() {
+        const { width, height } = this.scale;
+
         // --- Mode Switcher ---
-        this.createButton(100, 50, 'Paint Tiles', () => this.editMode = 'tile');
-        this.createButton(100, 100, 'Place Objects', () => this.editMode = 'object');
+        new NineSliceButton(this, 100, 50, 150, 40, 'Paint Tiles', () => this.editMode = 'tile');
+        new NineSliceButton(this, 100, 100, 150, 40, 'Place Objects', () => this.editMode = 'object');
 
         // --- Tile Palette ---
-        let tilePaletteX = 200;
+        let tilePaletteX = 280;
         Object.keys(this.mapConfig.tileset).forEach(key => {
             const tileType = parseInt(key, 10);
-            if (tileType === 1 || tileType === 3) return; // Don't allow painting obstacle tiles directly
-            
+            if (tileType === 1 || tileType === 3) return;
+
             const button = this.add.rectangle(tilePaletteX, 50, 30, 30, this.getTileColor(tileType))
                 .setStrokeStyle(2, 0xffffff)
                 .setInteractive({ useHandCursor: true });
-            
+
             button.on('pointerdown', () => {
                 this.editMode = 'tile';
                 this.currentTileType = tileType;
@@ -102,20 +96,21 @@ export class LevelEditor extends Phaser.Scene {
 
         // --- Object Palette ---
         const objectTypes = ['player_start', 'enemy', 'obstacle', 'chest', 'npc'];
-        let objectPaletteX = 200;
+        let objectPaletteX = 280;
         objectTypes.forEach(type => {
-            const button = this.createButton(objectPaletteX, 100, type, () => {
+            new NineSliceButton(this, objectPaletteX, 100, 120, 40, type, () => {
                 this.editMode = 'object';
                 this.currentObjectType = type;
             });
-            objectPaletteX += button.width + 10;
+            objectPaletteX += 130;
         });
     }
 
     createSaveLoadUI() {
         const { width, height } = this.scale;
+
         // --- Save Button ---
-        this.createButton(width - 100, 50, 'Save', () => {
+        new NineSliceButton(this, width - 100, 50, 150, 40, 'Save', () => {
             const levelName = prompt("Enter a name for the level config (e.g., level2):", this.mapConfig.name);
             if (!levelName) return;
 
@@ -139,7 +134,7 @@ export class LevelEditor extends Phaser.Scene {
         });
 
         // --- Back Button ---
-        this.createButton(width - 100, height - 50, 'Back to Menu', () => {
+        new NineSliceButton(this, width - 100, height - 50, 150, 40, 'Back to Menu', () => {
             this.scene.start('MainMenu');
         });
     }

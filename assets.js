@@ -21,6 +21,10 @@ export default {
         obstacle_tree: {
             key: 'obstacle_tree',
             args: ['src/assets/sprites/terrain/forest.png']
+        },
+        ui_button: {
+            key: 'ui_button',
+            args: ['assets/ui/button.png']
         }
     },
     'spritesheet': {

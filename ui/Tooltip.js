@@ -10,6 +10,7 @@ export class Tooltip {
         }
 
         const textObject = this.scene.add.text(0, 0, content, {
+            fontFamily: 'VT323',
             fontSize: '14px',
             fill: '#fff',
             wordWrap: { width: 150 }

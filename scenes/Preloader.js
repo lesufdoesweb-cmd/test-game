@@ -6,6 +6,13 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
+        // Dynamically load the font CSS file
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'assets/css/fonts.css';
+        document.head.appendChild(link);
+
         // Add a loading bar
         const { width, height } = this.scale;
         const progressBar = this.add.graphics();
@@ -18,7 +25,7 @@ export class Preloader extends Phaser.Scene {
             y: height / 2 - 50,
             text: 'Loading...',
             style: {
-                font: '20px monospace',
+                font: '20px VT323',
                 fill: '#ffffff'
             }
         }).setOrigin(0.5, 0.5);
@@ -28,7 +35,7 @@ export class Preloader extends Phaser.Scene {
             y: height / 2 - 5,
             text: '0%',
             style: {
-                font: '18px monospace',
+                font: '18px VT323',
                 fill: '#ffffff'
             }
         }).setOrigin(0.5, 0.5);

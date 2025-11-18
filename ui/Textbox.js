@@ -21,6 +21,7 @@ export class Textbox {
         bg.strokeRoundedRect(-width / 2 + 20, -boxHeight / 2, width - 40, boxHeight, 16);
 
         this.textObject = scene.add.text(-width / 2 + 40, -boxHeight / 2 + 10, '', {
+            fontFamily: 'VT323',
             fontSize: '18px',
             fill: '#ffffff',
             wordWrap: { width: width - 80 }
