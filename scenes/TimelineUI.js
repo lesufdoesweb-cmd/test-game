@@ -17,19 +17,19 @@ export class TimelineUI extends Phaser.Scene {
     }
 
     createPortraits() {
-        const startY = 50;
-        const stepY = 60;
+        const startY = 100;
+        const stepY = 120;
         const displayCount = 5;
 
         for (let i = 0; i < displayCount; i++) {
             const y = startY + i * stepY;
             const portraitBg = this.add.graphics();
             portraitBg.fillStyle(0x000000, 0.5);
-            portraitBg.fillRect(10, y - 25, 50, 50);
+            portraitBg.fillRect(20, y - 50, 100, 100);
 
             // Use a placeholder texture that exists
-            const portrait = this.add.sprite(35, y, 'basic_unit');
-            portrait.setScale(1.5);
+            const portrait = this.add.sprite(70, y, 'basic_unit');
+            portrait.setScale(3);
 
             this.portraits.push({ bg: portraitBg, sprite: portrait });
         }
@@ -48,11 +48,11 @@ export class TimelineUI extends Phaser.Scene {
 
             portrait.bg.clear();
             if (i === 0) {
-                portrait.bg.lineStyle(2, 0xffff00);
-                portrait.bg.strokeRect(10, portrait.sprite.y - 25, 50, 50);
+                portrait.bg.lineStyle(4, 0xffff00);
+                portrait.bg.strokeRect(20, portrait.sprite.y - 50, 100, 100);
             } else {
                 portrait.bg.fillStyle(0x000000, 0.5);
-                portrait.bg.fillRect(10, portrait.sprite.y - 25, 50, 50);
+                portrait.bg.fillRect(20, portrait.sprite.y - 50, 100, 100);
             }
         }
     }

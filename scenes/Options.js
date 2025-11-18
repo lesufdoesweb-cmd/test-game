@@ -8,25 +8,25 @@ export class Options extends Phaser.Scene {
         const centreY = this.scale.height * 0.5;
 
         this.add.text(centreX, centreY - 200, 'Options', {
-            fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 64, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5);
 
         this.add.text(centreX, centreY - 50, 'Volume: 100%', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5);
 
         this.add.text(centreX, centreY + 50, 'Difficulty: Normal', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5);
 
         const backButton = this.add.text(centreX, centreY + 200, 'Back', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5).setInteractive();

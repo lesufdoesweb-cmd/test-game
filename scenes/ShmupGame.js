@@ -60,7 +60,7 @@ export class ShmupGame extends Phaser.Scene {
     initGameUi() {
         // Create tutorial text
         this.tutorialText = this.add.text(this.centreX, this.centreY, 'Tap to shoot!', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         })
@@ -69,14 +69,14 @@ export class ShmupGame extends Phaser.Scene {
 
         // Create score text
         this.scoreText = this.add.text(20, 20, 'Score: 0', {
-            fontFamily: 'Arial Black', fontSize: 28, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 28, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
         })
             .setDepth(100);
 
         // Create game over text
         this.gameOverText = this.add.text(this.scale.width * 0.5, this.scale.height * 0.5, 'Game Over', {
-            fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
+            fontFamily: 'Pixelify-Sans', fontSize: 64, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         })

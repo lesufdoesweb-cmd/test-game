@@ -8,22 +8,23 @@ export class Textbox {
         this.isFinished = false;
 
         const { width, height } = scene.scale;
-        const barY = scene.scale.height - 16 * 3 - 5; // Position above action bar
-        const boxHeight = 100;
+        const barY = scene.scale.height - 16 * 6 - 10; // Position above action bar
+        const boxHeight = 200;
 
-        this.container = scene.add.container(width / 2, barY - boxHeight / 2 - 10);
+        this.container = scene.add.container(width / 2, barY - boxHeight / 2 - 20);
         this.container.setDepth(20000);
 
         const bg = scene.add.graphics();
         bg.fillStyle(0x111111, 0.8);
-        bg.lineStyle(2, 0x888888, 1);
-        bg.fillRoundedRect(-width / 2 + 20, -boxHeight / 2, width - 40, boxHeight, 16);
-        bg.strokeRoundedRect(-width / 2 + 20, -boxHeight / 2, width - 40, boxHeight, 16);
+        bg.lineStyle(4, 0x888888, 1);
+        bg.fillRoundedRect(-width / 2 + 40, -boxHeight / 2, width - 80, boxHeight, 32);
+        bg.strokeRoundedRect(-width / 2 + 40, -boxHeight / 2, width - 80, boxHeight, 32);
 
-        this.textObject = scene.add.text(-width / 2 + 40, -boxHeight / 2 + 10, '', {
-            fontSize: '18px',
+        this.textObject = scene.add.text(-width / 2 + 80, -boxHeight / 2 + 20, '', {
+            fontSize: '40px',
             fill: '#ffffff',
-            wordWrap: { width: width - 80 }
+            wordWrap: { width: width - 160 },
+            fontFamily: 'Pixelify-Sans'
         });
 
         this.container.add([bg, this.textObject]);

@@ -11,9 +11,11 @@ import { LevelEditor } from "./scenes/LevelEditor.js";
 
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    width: 1920,
+    height: 1080,
     backgroundColor: '#00000000', // Transparent black
+    pixelArt: true,
+    antialias: false,
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH

@@ -19,7 +19,7 @@ export class ActionUI extends Phaser.Scene {
 
         this.createActionBar();
         this.createButtons();
-        this.apText = this.add.text(10, this.scale.height - 30, '', { fontSize: '24px', fill: '#fff' }).setDepth(10002);
+        this.apText = this.add.text(20, this.scale.height - 60, '', { fontSize: '48px', fill: '#fff', fontFamily: 'Pixelify-Sans' }).setDepth(10002);
 
         this.gameScene.events.on('player_turn_started', (player) => this.showActions(player), this);
         this.gameScene.events.on('player_action_selected', this.showCancelUI, this);
@@ -77,12 +77,13 @@ export class ActionUI extends Phaser.Scene {
         }
 
         const textObject = this.add.text(0, 0, content, {
-            fontSize: '14px',
+            fontSize: '28px',
             fill: '#fff',
-            wordWrap: { width: 150 }
+            wordWrap: { width: 300 },
+            fontFamily: 'Pixelify-Sans'
         });
 
-        const padding = 8;
+        const padding = 16;
         const textWidth = textObject.width;
         const textHeight = textObject.height;
         const tooltipWidth = textWidth + padding * 2;
@@ -135,7 +136,7 @@ export class ActionUI extends Phaser.Scene {
     }
 
     createActionBar() {
-        const scale = 3;
+        const scale = 6;
         const barHeight = 16 * scale;
         const barX = this.scale.width / 2;
         const barY = this.scale.height - barHeight / 2 - 5;
@@ -159,17 +160,17 @@ export class ActionUI extends Phaser.Scene {
     }
 
     createButtons() {
-        const barTopY = this.scale.height - 16 * 3 - 5;
-        this.skipTurnButton = this.add.text(this.scale.width - 100, barTopY - 30, 'End Turn', {
-            fontSize: '18px', backgroundColor: '#333', padding: { x: 10, y: 5 }
+        const barTopY = this.scale.height - 16 * 6 - 10;
+        this.skipTurnButton = this.add.text(this.scale.width - 200, barTopY - 60, 'End Turn', {
+            fontSize: '36px', backgroundColor: '#333', padding: { x: 20, y: 10 }, fontFamily: 'Pixelify-Sans'
         }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
 
         this.skipTurnButton.on('pointerdown', () => {
             this.gameScene.events.emit('skip_turn');
         });
 
-        this.cancelActionButton = this.add.text(this.scale.width / 2, barTopY - 30, 'Cancel Action', {
-            fontSize: '18px', backgroundColor: '#800', padding: { x: 10, y: 5 }
+        this.cancelActionButton = this.add.text(this.scale.width / 2, barTopY - 60, 'Cancel Action', {
+            fontSize: '36px', backgroundColor: '#800', padding: { x: 20, y: 10 }, fontFamily: 'Pixelify-Sans'
         }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
 
         this.cancelActionButton.on('pointerdown', () => {
@@ -226,7 +227,7 @@ export class ActionUI extends Phaser.Scene {
         if (move.type === 'long_attack') frame = 2;
         if (move.type === 'move') frame = 7;
 
-        const scale = 3;
+        const scale = 6;
         const icon = this.add.sprite(slot.x - (1 * scale), slot.y + (3 * scale), ASSETS.spritesheet.ability_atlas.key, frame)
             .setDepth(10001)
             .setData('abilityKey', ability.key)
@@ -256,10 +257,11 @@ export class ActionUI extends Phaser.Scene {
             icon.setTint(0x808080);
             if (move.currentCooldown > 0) {
                 const cooldownText = this.add.text(icon.x, icon.y, move.currentCooldown, {
-                    fontSize: '16px',
+                    fontSize: '32px',
                     fill: '#fff',
                     stroke: '#000',
-                    strokeThickness: 4
+                    strokeThickness: 4,
+                    fontFamily: 'Pixelify-Sans'
                 }).setOrigin(0.5, 0.5).setDepth(10002);
                 
                 if (!this.cooldownTexts) this.cooldownTexts = [];

@@ -71,7 +71,7 @@ export class LevelEditor extends Phaser.Scene {
     
     createButton(x, y, text, onClick) {
         const button = this.add.text(x, y, text, {
-            fontSize: '16px', backgroundColor: '#333', padding: { x: 8, y: 4 }
+            fontSize: '16px', backgroundColor: '#333', padding: { x: 8, y: 4 }, fontFamily: 'Pixelify-Sans'
         }).setInteractive({ useHandCursor: true }).setOrigin(0.5);
 
         button.on('pointerdown', onClick);
@@ -201,7 +201,7 @@ export class LevelEditor extends Phaser.Scene {
             case 'npc': color = 0x00ff00; symbol = 'N'; break;
         }
 
-        const marker = this.add.text(tile.x, tile.y, symbol, { fontSize: '16px', fill: `#${color.toString(16)}`}).setOrigin(0.5);
+        const marker = this.add.text(tile.x, tile.y, symbol, { fontSize: '16px', fill: `#${color.toString(16)}`, fontFamily: 'Pixelify-Sans'}).setOrigin(0.5);
         marker.setDepth(tile.depth + 1);
         this.grid[0][0].parentContainer.add(marker);
         this.objectMarkers[key] = marker;

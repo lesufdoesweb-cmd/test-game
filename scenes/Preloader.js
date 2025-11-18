@@ -6,6 +6,7 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
+        this.load.font('Pixelify-Sans', 'src/assets/fonts/PixelifySans-VariableFont_wght.ttf', 'truetype')
         // Add a loading bar
         const { width, height } = this.scale;
         const progressBar = this.add.graphics();

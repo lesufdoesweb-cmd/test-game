@@ -8,13 +8,15 @@ export class MainMenu extends Phaser.Scene {
 
         this.add.text(width / 2, height / 4, 'One More Run', {
             fontSize: '48px',
-            fill: '#ffffff'
+            fill: '#ffffff',
+            fontFamily: 'Pixelify-Sans'
         }).setOrigin(0.5);
 
         // Start Game Button
         const startGameButton = this.add.text(width / 2, height / 2, 'Start Game', {
             fontSize: '32px',
-            fill: '#0f0'
+            fill: '#0f0',
+            fontFamily: 'Pixelify-Sans'
         })
         .setOrigin(0.5)
         .setInteractive();
@@ -29,7 +31,8 @@ export class MainMenu extends Phaser.Scene {
         // Level Selector Button
         const levelSelectorButton = this.add.text(width / 2, height / 2 + 70, 'Level Selector', {
             fontSize: '32px',
-            fill: '#0f0'
+            fill: '#0f0',
+            fontFamily: 'Pixelify-Sans'
         })
         .setOrigin(0.5)
         .setInteractive();
@@ -44,6 +47,7 @@ export class MainMenu extends Phaser.Scene {
         // Level Editor Button
         const levelEditorButton = this.add.text(width / 2, height / 2 + 140, 'Level Editor', {
             fontSize: '32px',
+            fontFamily: 'Pixelify-Sans',
             fill: '#0f0'
         })
         .setOrigin(0.5)

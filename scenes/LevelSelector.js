@@ -8,7 +8,8 @@ export class LevelSelector extends Phaser.Scene {
 
         this.add.text(width / 2, 50, 'Select a Level', {
             fontSize: '32px',
-            fill: '#ffffff'
+            fill: '#ffffff',
+            fontFamily: 'Pixelify-Sans'
         }).setOrigin(0.5);
 
         const levelFiles = [
@@ -36,7 +37,8 @@ export class LevelSelector extends Phaser.Scene {
             // Level Name Button
             const levelButton = this.add.text(width / 2 - 50, yPos, config.name, {
                 fontSize: '24px',
-                fill: '#0f0'
+                fill: '#0f0',
+                fontFamily: 'Pixelify-Sans'
             })
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true });
@@ -50,7 +52,8 @@ export class LevelSelector extends Phaser.Scene {
             // Edit Button
             const editButton = this.add.text(width / 2 + 100, yPos, 'Edit', {
                 fontSize: '20px',
-                fill: '#f0f'
+                fill: '#f0f',
+                fontFamily: 'Pixelify-Sans'
             })
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true });
@@ -67,7 +70,8 @@ export class LevelSelector extends Phaser.Scene {
 
         const backButton = this.add.text(width - 100, height - 50, 'Back', {
             fontSize: '24px',
-            fill: '#f00'
+            fill: '#f00',
+            fontFamily: 'Pixelify-Sans'
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });

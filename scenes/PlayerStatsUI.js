@@ -11,13 +11,14 @@ export class PlayerStatsUI extends Phaser.Scene {
         // A semi-transparent background for the stats
         const bg = this.add.graphics();
         bg.fillStyle(0x000000, 0.4);
-        bg.fillRoundedRect(10, 10, 200, 100, 8);
+        bg.fillRoundedRect(20, 20, 400, 200, 16);
         bg.setScrollFactor(0);
 
-        this.statsText = this.add.text(20, 20, '', {
-            fontSize: '16px',
+        this.statsText = this.add.text(40, 40, '', {
+            fontSize: '32px',
             fill: '#ffffff',
-            lineSpacing: 6
+            fontFamily: 'Pixelify-Sans',
+            lineSpacing: 12
         });
         this.statsText.setScrollFactor(0); // Fix it to the camera
 
