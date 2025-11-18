@@ -148,13 +148,13 @@ export class Game extends Phaser.Scene {
             this.anims.create({
                 key: 'knight_idle',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 0, end: 4 }),
-                frameRate: 8,
+                frameRate: 4,
                 repeat: -1
             });
             this.anims.create({
                 key: 'knight_walk',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 5, end: 14 }),
-                frameRate: 12,
+                frameRate: 24,
                 repeat: -1
             });
 
@@ -162,19 +162,19 @@ export class Game extends Phaser.Scene {
             this.anims.create({
                 key: 'orc_idle',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 26, end: 29 }),
-                frameRate: 6,
+                frameRate: 4,
                 repeat: -1
             });
             this.anims.create({
                 key: 'orc_walk',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 30, end: 37 }),
-                frameRate: 12,
+                frameRate: 24,
                 repeat: -1
             });
             this.anims.create({
                 key: 'orc_attack',
                 frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, { start: 38, end: 40 }),
-                frameRate: 8,
+                frameRate: 12,
                 repeat: 0
             });
 
@@ -184,7 +184,8 @@ export class Game extends Phaser.Scene {
             });
 
             // --- Camera and Input ---
-            this.cameras.main.setZoom(3);
+            this.cameras.main.setZoom(3.5);
+            this.cameras.main.setRoundPixels(true);
             this.cameras.main.centerOn(this.origin.x, this.origin.y);
 
             // --- Start Game ---
