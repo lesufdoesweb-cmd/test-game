@@ -13,10 +13,7 @@ export class LevelSelector extends Phaser.Scene {
         }).setOrigin(0.5);
 
         const levelFiles = [
-            '../levels/level_2_config.js',
             '../levels/level1_config.js',
-            '../levels/test_config.js',
-            '../levels/The First Step 2_config.js'
         ];
 
         const levelConfigs = [];

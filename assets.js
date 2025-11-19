@@ -26,9 +26,17 @@ export default {
             key: 'level_bg',
             args: ['src/assets/backgrounds/level_bg.png']
         },
-        forest_tiles: {
-            key: 'forest_tiles',
-            args: ['src/assets/sprites/terrain/forest_tile.png']
+        base_1: {
+            key: 'base_1',
+            args: ['src/assets/tiles/base_1.png']
+        },
+        base_2: {
+            key: 'base_2',
+            args: ['src/assets/tiles/base_2.png']
+        },
+        base_3: {
+            key: 'base_3',
+            args: ['src/assets/tiles/base_3.png']
         },
         obstacle_tree: {
             key: 'obstacle_tree',

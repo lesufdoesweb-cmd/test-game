@@ -17,7 +17,7 @@ export class Game extends Phaser.Scene {
         this.mapConsts = {
             MAP_SIZE_X: 0,
             MAP_SIZE_Y: 0,
-            TILE_WIDTH: 31,
+            TILE_WIDTH: 62,
             HALF_WIDTH: 0,
             QUARTER_HEIGHT: 0,
         }
@@ -184,7 +184,7 @@ export class Game extends Phaser.Scene {
             });
 
             // --- Camera and Input ---
-            this.cameras.main.setZoom(3.5);
+            this.cameras.main.setZoom(4.5);
             this.cameras.main.setRoundPixels(true);
             this.cameras.main.centerOn(this.origin.x, this.origin.y);
 
@@ -324,8 +324,8 @@ export class Game extends Phaser.Scene {
         createIsometricIndicator(screenX, screenY, color = 0x0000ff, alpha = 0.5) {
             const graphics = this.add.graphics();
             graphics.fillStyle(color, alpha);
-            screenY = screenY - 8;
-            const size = this.mapConsts.TILE_WIDTH * 1;
+            screenY = screenY - 6;
+            const size = this.mapConsts.TILE_WIDTH * 0.9;
             graphics.beginPath();
             graphics.moveTo(screenX, screenY - size / 4);
             graphics.lineTo(screenX + size / 2, screenY);
@@ -385,7 +385,7 @@ export class Game extends Phaser.Scene {
                 tweens.push({
                     targets: unit.sprite,
                     x: screenX,
-                    y: screenY - 16,
+                    y: screenY - 20,
                     duration: 200,
                     onStart: () => {
                         const prevPos = path[i - 1];
@@ -531,7 +531,7 @@ export class Game extends Phaser.Scene {
 
                         const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH;
                         const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT;
-                        const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.3);
+                        const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.2);
                         indicator.disableInteractive();
                         indicator.setDepth(neighbor.x + neighbor.y + 0.5);
                         highlights.push(indicator);
@@ -676,7 +676,7 @@ export class Game extends Phaser.Scene {
                 tweens.push({
                     targets: enemy.sprite,
                     x: screenX,
-                    y: screenY - 16,
+                    y: screenY - 20,
                     duration: 200,
                     onStart: () => {
                         const prevPos = path[i-1];
