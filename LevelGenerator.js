@@ -14,6 +14,22 @@ export class LevelGenerator {
             grid.push(row);
         }
 
+        // Apply layout overrides from the config
+        if (config.layout && config.layout.length > 0) {
+            for (let y = 0; y < config.layout.length; y++) {
+                if (!config.layout[y]) continue;
+                for (let x = 0; x < config.layout[y].length; x++) {
+                    const tileId = config.layout[y][x];
+                    // If the config has a non-void tile for this spot, use it.
+                    if (tileId !== undefined && tileId !== -1) {
+                        if (grid[y] && grid[y][x] !== undefined) {
+                            grid[y][x] = tileId;
+                        }
+                    }
+                }
+            }
+        }
+
         // Place objects that affect the grid
         config.objects.forEach(obj => {
             if (obj.type === 'obstacle') {

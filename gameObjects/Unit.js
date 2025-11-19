@@ -30,7 +30,7 @@ export class Unit {
         const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
         const screenY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
 
-        this.sprite = scene.add.sprite(screenX, screenY - 20, texture, frame);
+        this.sprite = scene.add.sprite(screenX, screenY - 14, texture, frame);
         this.sprite.setDepth(screenY);
         this.sprite.setScale(1.5);
         this.healthBar = null;

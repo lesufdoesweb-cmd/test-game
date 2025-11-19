@@ -7,7 +7,9 @@ export const level1Config = {
         3: { type: 'walkable_obstacle', assetKey: 'base_1' },
         10: { type: 'walkable', assetKey: 'base_1' },
         11: { type: 'walkable', assetKey: 'base_2' },
-        12: { type: 'walkable', assetKey: 'base_3' }
+        12: { type: 'walkable', assetKey: 'base_3' },
+        13: { type: 'walkable', assetKey: 'dirt_1' },
+        14: { type: 'walkable', assetKey: 'dirt_2' }
     },
     objects: [
         { type: 'player_start', position: { x: 4, y: 10 } },

@@ -66,17 +66,7 @@ export class Game extends Phaser.Scene {
                     tile.setDepth(gridX + gridY);
                 }
 
-                const interactiveZone = this.add.zone(screenX + 8, screenY, this.mapConsts.TILE_WIDTH, this.mapConsts.TILE_WIDTH / 2);
-                interactiveZone.setDepth(gridX + gridY + 0.2);
-                interactiveZone.setData('gridX', gridX);
-                interactiveZone.setData('gridY', gridY);
-                const hitArea = new Phaser.Geom.Polygon([
-                    0, -this.mapConsts.QUARTER_HEIGHT,
-                    this.mapConsts.HALF_WIDTH, 0,
-                    0, this.mapConsts.QUARTER_HEIGHT,
-                    -this.mapConsts.HALF_WIDTH, 0
-                ]);
-                interactiveZone.setInteractive(hitArea, Phaser.Geom.Polygon.Contains);
+
             }
         }
 
@@ -186,7 +176,7 @@ export class Game extends Phaser.Scene {
             // --- Camera and Input ---
             this.cameras.main.setZoom(4.5);
             this.cameras.main.setRoundPixels(true);
-            this.cameras.main.centerOn(this.origin.x, this.origin.y);
+            this.cameras.main.centerOn(this.player.sprite.x, this.player.sprite.y);
 
             // --- Start Game ---
             this.buildTurnOrder();
@@ -279,17 +269,19 @@ export class Game extends Phaser.Scene {
                 }
 
                 if (this.playerActionState === 'move') {
-                    if (gameObjects.length > 0) {
-                        const clickedZone = gameObjects.find(go => go.getData('gridX') !== undefined);
-                        if (clickedZone) {
-                            const targetX = clickedZone.getData('gridX');
-                            const targetY = clickedZone.getData('gridY');
-                            const unitOnTile = this.units.find(u => u.gridPos.x === targetX && u.gridPos.y === targetY);
-                            if (unitOnTile && unitOnTile !== this.player) {
-                                return;
-                            }
-                            this.movePlayer(targetX, targetY);
-                        }
+                    const gridPos = this.screenToGrid(pointer.worldX, pointer.worldY);
+                    const targetX = gridPos.x;
+                    const targetY = gridPos.y;
+
+                    if (targetX < 0 || targetX >= this.mapConsts.MAP_SIZE_X || targetY < 0 || targetY >= this.mapConsts.MAP_SIZE_Y) {
+                        return;
+                    }
+                    const unitOnTile = this.units.find(u => u.gridPos.x === targetX && u.gridPos.y === targetY);
+                    if (unitOnTile && unitOnTile !== this.player) {
+                        return;
+                    }
+                    if (this.walkableTiles.includes(this.grid[targetY][targetX])) {
+                        this.movePlayer(targetX, targetY);
                     }
                 } else if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
                     const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -321,11 +313,21 @@ export class Game extends Phaser.Scene {
             this.units.forEach(u => u.update());
         }
 
+        screenToGrid(screenX, screenY) {
+            const dx = screenX - this.origin.x;
+            const dy = screenY - this.origin.y;
+
+            const gridX = Math.round((dx / this.mapConsts.HALF_WIDTH + dy / this.mapConsts.QUARTER_HEIGHT) / 2);
+            const gridY = Math.round((dy / this.mapConsts.QUARTER_HEIGHT - dx / this.mapConsts.HALF_WIDTH) / 2);
+
+            return { x: gridX, y: gridY };
+        }
+
         createIsometricIndicator(screenX, screenY, color = 0x0000ff, alpha = 0.5) {
             const graphics = this.add.graphics();
             graphics.fillStyle(color, alpha);
             screenY = screenY - 6;
-            const size = this.mapConsts.TILE_WIDTH * 0.9;
+            const size = this.mapConsts.TILE_WIDTH * 1;
             graphics.beginPath();
             graphics.moveTo(screenX, screenY - size / 4);
             graphics.lineTo(screenX + size / 2, screenY);

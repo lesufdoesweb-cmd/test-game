@@ -38,6 +38,14 @@ export default {
             key: 'base_3',
             args: ['src/assets/tiles/base_3.png']
         },
+        dirt_1: {
+            key: 'dirt_1',
+            args: ['src/assets/tiles/dirt_1.png']
+        },
+        dirt_2: {
+            key: 'dirt_2',
+            args: ['src/assets/tiles/dirt_2.png']
+        },
         obstacle_tree: {
             key: 'obstacle_tree',
             args: ['src/assets/sprites/terrain/forest.png']
