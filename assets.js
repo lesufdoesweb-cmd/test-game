@@ -6,6 +6,18 @@ export default {
     //     },
     // },
     'image': {
+        button_background: {
+            key: 'button_background',
+            args: ['src/assets/user_interface/button_background.png']
+        },
+        bg_main_screen: {
+            key: 'bg_main_screen',
+            args: ['src/assets/main_screen/bg_main_screen.png']
+        },
+        title_main_screen: {
+            key: 'title_main_screen',
+            args: ['src/assets/main_screen/title_main_screen.png']
+        },
         ability_bar: {
             key: 'ability_bar',
             args: ['src/assets/sprites/ui/ability_bar.png']
