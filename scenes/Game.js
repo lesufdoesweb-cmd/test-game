@@ -26,6 +26,7 @@ export class Game extends Phaser.Scene {
         this.turnOrder = [];
         this.turnIndex = 0;
         this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
+        this.vignette = null;
     }
 
     create(data) {
@@ -61,8 +62,8 @@ export class Game extends Phaser.Scene {
                 const screenY = this.origin.y + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
 
                 const tileInfo = levelData.tileset[tileType];
-                if (tileInfo) {
-                    const tile = this.add.image(screenX, screenY, ASSETS.image[tileInfo.assetKey].key);
+                if (tileInfo && tileInfo.assetKey) {
+                    const tile = this.add.image(screenX, screenY, tileInfo.assetKey);
                     tile.setDepth(gridX + gridY);
                 }
 
@@ -308,9 +309,28 @@ export class Game extends Phaser.Scene {
                     cam.scrollY -= (pointer.y - pointer.prevPosition.y) / cam.zoom;
                 }
             });
+
+            // --- Player-following Vignette ---
+            const vignetteTexture = this.textures.createCanvas('playerVignette', 1024, 1024);
+            const context = vignetteTexture.getContext();
+            const gradient = context.createRadialGradient(512, 512, 150, 512, 512, 512);
+
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(1, 'rgba(0,40,0,0.7)');
+
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 1024, 1024);
+            vignetteTexture.refresh();
+
+            this.vignette = this.add.image(this.player.sprite.x, this.player.sprite.y, 'playerVignette');
+            this.vignette.setDepth(2000); // Higher than map and sprites, below UI
     }
         update(time, delta) {
             this.units.forEach(u => u.update());
+            if (this.vignette && this.player) {
+                this.vignette.x = this.player.sprite.x;
+                this.vignette.y = this.player.sprite.y;
+            }
         }
 
         screenToGrid(screenX, screenY) {

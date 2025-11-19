@@ -59,12 +59,12 @@ export class Unit {
         this.healthBar.fillRect(x - borderThickness, y - borderThickness, width + borderThickness * 2, height + borderThickness * 2);
 
         // Background (empty part)
-        this.healthBar.fillStyle(0xff0000);
+        this.healthBar.fillStyle(0x000000);
         this.healthBar.fillRect(x, y, width, height);
 
         // Foreground (health part)
         const healthPercentage = this.stats.currentHealth / this.stats.maxHealth;
-        this.healthBar.fillStyle(0x00ff00);
+        this.healthBar.fillStyle(0xff0000);
         this.healthBar.fillRect(x, y, width * healthPercentage, height);
     }
 
