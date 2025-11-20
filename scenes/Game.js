@@ -582,7 +582,7 @@ export class Game extends Phaser.Scene {
                 enemy.sprite.flipX = false;
             }
 
-            enemy.attack(this.player);
+            enemy.attack(this.player, 'attack');
             if (callback) {
                 this.time.delayedCall(300, callback, []);
             }
