@@ -6,6 +6,10 @@ export default {
     //     },
     // },
     'image': {
+        knight: {
+            key: 'knight',
+            args: ['src/assets/sprites/units/knight.png']
+        },
         button_background: {
             key: 'button_background',
             args: ['src/assets/user_interface/button_background.png']

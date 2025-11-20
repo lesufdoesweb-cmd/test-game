@@ -1,4 +1,5 @@
 import ASSETS from '../assets.js';
+import AnimationController from './AnimationController.js';
 
 export class Unit {
     constructor(scene, { gridX, gridY, texture, frame, name, stats }) {
@@ -31,6 +32,7 @@ export class Unit {
         const screenY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
 
         this.sprite = scene.add.sprite(screenX, screenY - 14, texture, frame);
+        this.animationController = new AnimationController(scene, this.sprite);
         this.sprite.setDepth(screenY);
         this.sprite.setScale(1.5);
         this.healthBar = null;
@@ -74,11 +76,14 @@ export class Unit {
         this.updateHealthBar();
     }
 
-    attack(target) {
-        console.log(`${this.name} attacks ${target.name}`);
-        // In a real game, you'd play an attack animation here
-        // this.sprite.play('knight_attack');
-        target.takeDamage(this.stats.physicalDamage, this);
+    attack(target, moveType) {
+        if (moveType === 'attack') {
+            this.animationController.playAttackAnimation(target, () => {
+                target.takeDamage(this.stats.physicalDamage, this);
+            });
+        } else {
+            target.takeDamage(this.stats.physicalDamage, this);
+        }
     }
 
     takeDamage(amount, attacker = null) {
