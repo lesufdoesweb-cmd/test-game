@@ -136,23 +136,18 @@ export class ActionUI extends Phaser.Scene {
     }
 
     createActionBar() {
-        const scale = 6;
-        const barHeight = 16 * scale;
-        const barX = this.scale.width / 2;
-        const barY = this.scale.height - barHeight / 2 - 5;
-        this.actionBar = this.add.image(barX, barY, ASSETS.image.ability_bar.key).setOrigin(0.5, 0.5).setDepth(9999).setScale(scale);
+        const slotCount = 6;
+        const bgScale = 5;
+        const slotSize = 16 * bgScale; // ability_bg is 16x16
+        const spacing = 30;
 
-        const squareSize = 12;
-        const startX = 13;
-        const spacing = 3;
-        const barImageWidth = 115;
+        const totalWidth = slotCount * slotSize + (slotCount - 1) * spacing;
+        const startX = (this.scale.width - totalWidth) / 2;
+        const slotY = this.scale.height - (slotSize / 2) - 20;
 
-        const firstSlotX = barX - (barImageWidth / 2) * scale + (startX + squareSize / 2) * scale;
-
-        for (let i = 0; i < 6; i++) {
-            const slotX = firstSlotX + i * (squareSize + spacing) * scale;
-            const slotY = barY;
-            const slot = this.add.zone(slotX, slotY, squareSize * scale, squareSize * scale).setRectangleDropZone(squareSize * scale, squareSize * scale);
+        for (let i = 0; i < slotCount; i++) {
+            const slotX = startX + i * (slotSize + spacing) + (slotSize / 2);
+            const slot = this.add.zone(slotX, slotY, slotSize, slotSize).setRectangleDropZone(slotSize, slotSize);
             slot.setData('isSlot', true);
             slot.setData('slotIndex', i);
             this.slots.push({ x: slotX, y: slotY, dropZone: slot });
@@ -180,7 +175,6 @@ export class ActionUI extends Phaser.Scene {
 
     showActions(unit) {
         this.hideAbilities();
-        this.actionBar.setVisible(true);
         this.cancelActionButton.setVisible(false);
         this.skipTurnButton.setVisible(true);
         this.apText.setText(`AP: ${unit.stats.currentAp}/${unit.stats.maxAp}`);
@@ -199,7 +193,6 @@ export class ActionUI extends Phaser.Scene {
 
     showCancelUI() {
         this.hideAbilities();
-        this.actionBar.setVisible(false);
         this.skipTurnButton.setVisible(false);
         this.cancelActionButton.setVisible(true);
     }
@@ -215,6 +208,11 @@ export class ActionUI extends Phaser.Scene {
         const slot = this.slots[slotIndex];
         if (!slot) return;
 
+        const bgScale = 0.8;
+        const bg = this.add.image(slot.x, slot.y, ASSETS.image.ability_bg.key)
+            .setScale(bgScale)
+            .setDepth(10000);
+
         const move = ability.moveData;
         let isEnabled = true;
         if (move.currentCooldown > 0) isEnabled = false;
@@ -227,8 +225,8 @@ export class ActionUI extends Phaser.Scene {
         if (move.type === 'long_attack') frame = 2;
         if (move.type === 'move') frame = 7;
 
-        const scale = 6;
-        const icon = this.add.sprite(slot.x - (1 * scale), slot.y + (3 * scale), ASSETS.spritesheet.ability_atlas.key, frame)
+        const scale = 8;
+        const icon = this.add.sprite(slot.x - 12, slot.y - 12, ASSETS.spritesheet.ability_atlas.key, frame)
             .setDepth(10001)
             .setData('abilityKey', ability.key)
             .setScale(scale);
@@ -244,12 +242,24 @@ export class ActionUI extends Phaser.Scene {
             });
 
             icon.on('pointerover', () => {
+                this.tweens.add({
+                    targets: [icon, bg],
+                    y: '-=5', // Move up 5 pixels
+                    duration: 100,
+                    ease: 'Power1'
+                });
                 const move = ability.moveData;
                 const abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}\nCooldown: ${move.cooldown}`;
                 this.showTooltip(abilityText, icon.x, icon.y);
             });
     
             icon.on('pointerout', () => {
+                this.tweens.add({
+                    targets: [icon, bg],
+                    y: '+=5', // Move back down 5 pixels
+                    duration: 100,
+                    ease: 'Power1'
+                });
                 this.hideTooltip();
             });
 
@@ -270,6 +280,7 @@ export class ActionUI extends Phaser.Scene {
         }
 
         ability.gameObject = icon;
+        ability.background = bg;
     }
 
     resetAbilityPosition(abilityKey) {
@@ -290,6 +301,10 @@ export class ActionUI extends Phaser.Scene {
                 ability.gameObject.destroy();
                 ability.gameObject = null;
             }
+            if (ability && ability.background) {
+                ability.background.destroy();
+                ability.background = null;
+            }
         });
         this.cooldownTexts.forEach(text => text.destroy());
         this.cooldownTexts = [];
@@ -297,7 +312,6 @@ export class ActionUI extends Phaser.Scene {
 
     hideAll() {
         this.hideAbilities();
-        if (this.actionBar) this.actionBar.setVisible(false);
         this.skipTurnButton.setVisible(false);
         this.cancelActionButton.setVisible(false);
         this.apText.setText('');

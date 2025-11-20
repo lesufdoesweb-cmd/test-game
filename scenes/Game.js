@@ -28,6 +28,11 @@ export class Game extends Phaser.Scene {
         this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
         this.vignette = null;
         this.isMoving = false; // ensure defined
+        this.isMiddleButtonDown = false;
+        this.lastCameraX = 0;
+        this.lastCameraY = 0;
+        this.lastPointerX = 0;
+        this.lastPointerY = 0;
     }
 
     create(data) {
@@ -275,6 +280,33 @@ export class Game extends Phaser.Scene {
                 if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
                     this.performPlayerAttack(targetUnit);
                 }
+            }
+        });
+
+        // Camera drag with middle mouse button
+        this.input.on('pointerdown', (pointer) => {
+            if (pointer.middleButtonDown()) {
+                this.isMiddleButtonDown = true;
+                this.lastCameraX = this.cameras.main.scrollX;
+                this.lastCameraY = this.cameras.main.scrollY;
+                this.lastPointerX = pointer.x;
+                this.lastPointerY = pointer.y;
+            }
+        });
+
+        this.input.on('pointermove', (pointer) => {
+            if (this.isMiddleButtonDown) {
+                const dx = pointer.x - this.lastPointerX;
+                const dy = pointer.y - this.lastPointerY;
+
+                this.cameras.main.scrollX = this.lastCameraX - dx / this.cameras.main.zoom;
+                this.cameras.main.scrollY = this.lastCameraY - dy / this.cameras.main.zoom;
+            }
+        });
+
+        this.input.on('pointerup', (pointer) => {
+            if (this.isMiddleButtonDown) {
+                this.isMiddleButtonDown = false;
             }
         });
     }

@@ -53,6 +53,10 @@ export default {
         obstacle_tree: {
             key: 'obstacle_tree',
             args: ['src/assets/sprites/terrain/forest.png']
+        },
+        ability_bg: {
+            key: 'ability_bg',
+            args: ['src/assets/user_interface/ability_bg.png']
         }
     },
     'spritesheet': {
