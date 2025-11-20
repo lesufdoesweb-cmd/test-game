@@ -248,6 +248,7 @@ export class ActionUI extends Phaser.Scene {
                     duration: 100,
                     ease: 'Power1'
                 });
+                bg.setTint(0xffd700);
                 const move = ability.moveData;
                 const abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}\nCooldown: ${move.cooldown}`;
                 this.showTooltip(abilityText, icon.x, icon.y);
@@ -260,6 +261,7 @@ export class ActionUI extends Phaser.Scene {
                     duration: 100,
                     ease: 'Power1'
                 });
+                bg.clearTint();
                 this.hideTooltip();
             });
 

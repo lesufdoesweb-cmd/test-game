@@ -57,6 +57,10 @@ export default {
         ability_bg: {
             key: 'ability_bg',
             args: ['src/assets/user_interface/ability_bg.png']
+        },
+        timeline_bg: {
+            key: 'timeline_bg',
+            args: ['src/assets/user_interface/timeline_bg.png']
         }
     },
     'spritesheet': {

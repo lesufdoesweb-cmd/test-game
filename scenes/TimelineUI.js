@@ -22,15 +22,16 @@ export class TimelineUI extends Phaser.Scene {
         const startY = 100;
         const stepY = 120;
         const displayCount = 8;
+        const bgScale = 0.8;
 
         for (let i = 0; i < displayCount; i++) {
             const y = startY + i * stepY;
-            const portraitBg = this.add.graphics();
-            portraitBg.fillStyle(0x000000, 0.5);
-            portraitBg.fillRect(20, y - 50, 100, 100);
+            const x = 70;
+            const portraitBg = this.add.image(x, y, ASSETS.image.timeline_bg.key)
+                .setScale(bgScale);
 
             // Use a placeholder texture that exists
-            const portrait = this.add.sprite(70, y, ASSETS.image.knight.key);
+            const portrait = this.add.sprite(x, y, ASSETS.image.knight.key);
             portrait.setScale(3);
             portrait.setVisible(false); // Hide until updated with actual unit data
 
@@ -61,13 +62,10 @@ export class TimelineUI extends Phaser.Scene {
                 portrait.sprite.setVisible(false); // Hide if no unit for this turn slot
             }
 
-            portrait.bg.clear();
             if (i === 0) {
-                portrait.bg.lineStyle(4, 0xffff00);
-                portrait.bg.strokeRect(20, portrait.sprite.y - 50, 100, 100);
+                portrait.bg.setTint(0xffd700);
             } else {
-                portrait.bg.fillStyle(0x000000, 0.5);
-                portrait.bg.fillRect(20, portrait.sprite.y - 50, 100, 100);
+                portrait.bg.clearTint();
             }
         }
     }
