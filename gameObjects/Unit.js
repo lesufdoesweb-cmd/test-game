@@ -32,7 +32,7 @@ export class Unit {
         this.hasMoved = false;
         this.usedStandardAction = false;
 
-        const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
+        const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH + 3;
         const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT - 24;
 
         this.sprite = scene.add.sprite(screenX, originalY, texture, frame);

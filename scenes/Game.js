@@ -23,6 +23,8 @@ export class Game extends Phaser.Scene {
             QUARTER_HEIGHT: 0,
         }
         this.rangeHighlights = [];
+        this.validActionTiles = [];
+        this.hoverIndicator = null;
 
         this.turnOrder = [];
         this.turnIndex = 0;
@@ -66,8 +68,8 @@ export class Game extends Phaser.Scene {
                 const tileType = this.grid[gridY][gridX];
                 if (tileType === -1) continue; // Skip void tiles
 
-                const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
-                const screenY = this.origin.y + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
+                const screenX = this.origin.x + 3 + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y + 3  + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
 
                 const tileInfo = levelData.tileset[tileType];
                 if (tileInfo && tileInfo.assetKey) {
@@ -173,7 +175,12 @@ export class Game extends Phaser.Scene {
         this.scene.launch('TimelineUI', {turnOrder: this.turnOrder});
         this.scene.launch('ActionUI');
         this.scene.launch('PlayerStatsUI');
-        this.startNextTurn();
+
+        // Delay the start of the first turn by a tiny amount
+        // to ensure all UI scenes have time to set up their event listeners.
+        this.time.delayedCall(1, () => {
+            this.startNextTurn();
+        });
 
         // --- Event Listeners ---
         this.events.on('unit_stats_changed', (unit) => {
@@ -328,6 +335,30 @@ export class Game extends Phaser.Scene {
             this.vignette.x = this.activePlayerUnit.sprite.x;
             this.vignette.y = this.activePlayerUnit.sprite.y;
         }
+
+        // --- Hover Indicator Logic ---
+        if (this.hoverIndicator) {
+            this.hoverIndicator.destroy();
+            this.hoverIndicator = null;
+        }
+
+        const actionState = this.playerActionState;
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'long_attack') {
+            const pointer = this.input.activePointer;
+            const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
+
+            const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
+
+            if (isTileValid) {
+                const color = (actionState === 'move') ? 0xffffff : 0xff0000;
+                const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
+                
+                this.hoverIndicator = this.createIsometricIndicator(screenX, screenY, color, 0.6);
+                this.hoverIndicator.setDepth(gridPos.x + gridPos.y + 0.6); // Slightly above range highlight
+            }
+        }
     }
 
     screenToGrid(screenX, screenY) {
@@ -397,7 +428,7 @@ export class Game extends Phaser.Scene {
         }
 
         const screenPath = path.map(pos => ({
-            x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
+            x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH + 3,
             y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT - 24,
         }));
 
@@ -430,7 +461,7 @@ export class Game extends Phaser.Scene {
                 }
 
                 // Update the 'originalY' for the new position
-                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT - 24;
+                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT - 26;
                 unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
                 unit.sprite.setData('originalY', newOriginalY);
 
@@ -495,26 +526,56 @@ export class Game extends Phaser.Scene {
     }
 
     deactivateCurrentPlayerUnitSelection() {
-        if (this.activeUnitTween) {
-            this.activeUnitTween.stop();
-        }
         if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
+            this.tweens.killTweensOf(this.activePlayerUnit.sprite);
             this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
         }
+        this.activeUnitTween = null; // Clear the reference
         this.activePlayerUnit = null;
         this.playerActionState = null;
         this.clearHighlights(); // Also clear highlights when deselecting
     }
 
-    startPlayerUnitTurn(unit) {
+    activatePlayerUnit(unit) {
+        // If the same unit is activated again, do nothing.
+        if (this.activePlayerUnit === unit) {
+            return;
+        }
+
+        // Deactivate any previously active unit.
         this.deactivateCurrentPlayerUnitSelection();
+
+        // Kill any lingering tweens (like hover) on the new unit.
+        this.tweens.killTweensOf(unit.sprite);
+
+        // Set the new active unit.
+        this.activePlayerUnit = unit;
+        this.events.emit('player_unit_selected', unit);
+
+        // Start the bobbing selection tween for the new active unit.
+        this.activeUnitTween = this.tweens.add({
+            targets: this.activePlayerUnit.sprite,
+            y: this.activePlayerUnit.sprite.getData('originalY') - 5,
+            duration: 500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
+    }
+
+    startPlayerUnitTurn(unit) {
         this.gameState = 'PLAYER_TURN';
         this.playerActionState = 'SELECTING_ACTION';
-        this.activePlayerUnit = unit;
-        this.activePlayerUnit.stats.currentAp = this.activePlayerUnit.stats.maxAp;
-        this.activePlayerUnit.hasMoved = false;
-        this.activePlayerUnit.usedStandardAction = false;
-        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+
+        // Set stats for the new turn
+        unit.stats.currentAp = unit.stats.maxAp;
+        unit.hasMoved = false;
+        unit.usedStandardAction = false;
+        this.events.emit('unit_stats_changed', unit);
+
+        // Activate the unit, which handles selection and animation
+        this.activatePlayerUnit(unit);
+
         this.events.emit('player_turn_started', this.activePlayerUnit);
     }
 
@@ -581,7 +642,6 @@ export class Game extends Phaser.Scene {
         const openList = [{pos: startPos, cost: 0}];
         const closedList = new Set();
         closedList.add(`${startPos.x},${startPos.y}`);
-        const highlights = [];
 
         const enemyPositions = new Set();
         if (color === 0x0000ff) { // Only avoid enemies for move highlights
@@ -613,17 +673,17 @@ export class Game extends Phaser.Scene {
 
                     closedList.add(posKey);
                     openList.push({pos: neighbor, cost: current.cost + 1});
+                    this.validActionTiles.push(neighbor); // Store the valid tile
 
                     const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH;
                     const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT;
                     const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.2);
                     indicator.disableInteractive();
                     indicator.setDepth(neighbor.x + neighbor.y + 0.5);
-                    highlights.push(indicator);
+                    this.rangeHighlights.push(indicator);
                 }
             }
         }
-        this.rangeHighlights = highlights;
     }
 
     highlightAttackableEnemies(range) {
@@ -642,6 +702,11 @@ export class Game extends Phaser.Scene {
             this.rangeHighlights.forEach(h => h.destroy());
             this.rangeHighlights = [];
         }
+        if (this.hoverIndicator) {
+            this.hoverIndicator.destroy();
+            this.hoverIndicator = null;
+        }
+        this.validActionTiles = [];
     }
 
     getUnitAtScreenPos(screenX, screenY) {
@@ -795,75 +860,47 @@ export class Game extends Phaser.Scene {
 
         // Player unit specific interactions
         if (unit.isPlayer) {
-                    unit.sprite.on('pointerdown', () => {
-                        // If we're clicking the same unit that's already active, do nothing.
-                        if (this.activePlayerUnit === unit) return;
-            
-                        // Deactivate the currently active player unit's state
-                        this.deactivateCurrentPlayerUnitSelection();
-            
-                        // If the unit being clicked had a hover tween, stop it
-                        if (unit.hoverTween) {
-                            unit.hoverTween.stop();
-                            unit.hoverTween = null;
-                        }
-            
-                        // Set the new active unit
-                        this.activePlayerUnit = unit;
-                        this.events.emit('player_unit_selected', unit);
-            
-                        // Start the bobbing selection tween for the new active unit.
-                        this.activeUnitTween = this.tweens.add({
-                            targets: this.activePlayerUnit.sprite,
-                            y: this.activePlayerUnit.sprite.getData('originalY') - 5,
-                            duration: 500,
-                            ease: 'Sine.easeInOut',
-                            yoyo: true,
-                            repeat: -1
-                        });
-                    });
-                }
-            
-                // Hover effects for all units
-                unit.sprite.on('pointerover', () => {
-                    // Only apply hover effect if it's a player unit AND not the currently active one
-                    if (unit.isPlayer && this.activePlayerUnit !== unit) {
-                        // If there's an existing hover tween, stop it first to prevent conflicts
-                        if (unit.hoverTween) {
-                            unit.hoverTween.stop();
-                        }
-                        // Start the bobbing hover tween
-                        unit.hoverTween = this.tweens.add({
-                            targets: unit.sprite,
-                            y: unit.sprite.getData('originalY') - 5, // Float up slightly
-                            duration: 500,
-                            ease: 'Sine.easeInOut',
-                            yoyo: true,
-                            repeat: -1
-                        });
-                    }
+                                    unit.sprite.on('pointerdown', () => {
+                                        this.activatePlayerUnit(unit);
+                                    });                        }
                     
-                    const actionUI = this.scene.get('ActionUI');
-                    if (!actionUI) return;
-            
-                    const stats = unit.stats;
-                    const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
-                    actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
-                });
-            
-                unit.sprite.on('pointerout', () => {
-                    // Only reset hover effect if it's a player unit AND not the currently active one
-                    if (unit.isPlayer && this.activePlayerUnit !== unit) {
-                        if (unit.hoverTween) {
-                            unit.hoverTween.stop();
-                            unit.hoverTween = null; // Clear the reference
-                        }
-                        // Reset the Y position to its original
-                        unit.sprite.setY(unit.sprite.getData('originalY'));
-                    }
-            
-                    const actionUI = this.scene.get('ActionUI');
-                    if (!actionUI) return;
-                    actionUI.hideGameTooltip();
-                });
-            }}
+                        // Hover effects for all units
+                        unit.sprite.on('pointerover', () => {
+                            // Only apply hover effect if it's a player unit AND not the currently active one
+                            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                                // Kill any existing tweens to prevent conflicts before starting the new one.
+                                this.tweens.killTweensOf(unit.sprite);
+                    
+                                // Start the bobbing hover tween
+                                this.tweens.add({
+                                    targets: unit.sprite,
+                                    y: unit.sprite.getData('originalY') - 5, // Float up slightly
+                                    duration: 500,
+                                    ease: 'Sine.easeInOut',
+                                    yoyo: true,
+                                    repeat: -1
+                                });
+                            }
+                            
+                            const actionUI = this.scene.get('ActionUI');
+                            if (!actionUI) return;
+                    
+                            const stats = unit.stats;
+                            const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
+                            actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
+                        });
+                    
+                        unit.sprite.on('pointerout', () => {
+                            // Only reset hover effect if it's a player unit AND not the currently active one
+                            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                                // Kill all tweens on the sprite (i.e., the hover tween).
+                                this.tweens.killTweensOf(unit.sprite);
+                                // Reset the Y position to its original.
+                                unit.sprite.setY(unit.sprite.getData('originalY'));
+                            }
+                    
+                            const actionUI = this.scene.get('ActionUI');
+                            if (!actionUI) return;
+                            actionUI.hideGameTooltip();
+                        });
+                    }}

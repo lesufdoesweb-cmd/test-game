@@ -32,7 +32,7 @@ export class TimelineUI extends Phaser.Scene {
 
             // Use a placeholder texture that exists
             const portrait = this.add.sprite(x, y, ASSETS.image.archer.key);
-            portrait.setScale(3);
+            portrait.setScale(2);
             portrait.setVisible(false); // Hide until updated with actual unit data
 
             this.portraits.push({ bg: portraitBg, sprite: portrait });
