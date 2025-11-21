@@ -1,10 +1,10 @@
 import ASSETS from '../assets.js';
-import AnimationController from './AnimationController.js';
 
 export class Unit {
-    constructor(scene, { gridX, gridY, texture, frame, name, stats }) {
+    constructor(scene, { gridX, gridY, texture, frame, name, stats, isPlayer = false }) {
         this.scene = scene;
         this.name = name;
+        this.isPlayer = isPlayer;
         this.stats = {
             maxHealth: 100,
             currentHealth: 100,
@@ -17,11 +17,15 @@ export class Unit {
             ...stats
         };
 
-        this.moves = [
-            { name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 },
-            { name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0 },
-            { name: 'Long Shot', type: 'long_attack', range: 4, cost: 1, cooldown: 2, currentCooldown: 0 }
-        ];
+        this.moves = [];
+        if (this.name === 'Archer') {
+            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 });
+            this.moves.push({ name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0 });
+        } else { // Default moves for other units (e.g., Orc)
+            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 });
+            this.moves.push({ name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0 });
+        }
+
 
         this.gridPos = { x: gridX, y: gridY };
 
@@ -29,12 +33,12 @@ export class Unit {
         this.usedStandardAction = false;
 
         const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
-        const screenY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
+        const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT - 24;
 
-        this.sprite = scene.add.sprite(screenX, screenY - 14, texture, frame);
-        this.animationController = new AnimationController(scene, this.sprite);
-        this.sprite.setDepth(screenY);
-        this.sprite.setScale(1.5);
+        this.sprite = scene.add.sprite(screenX, originalY, texture, frame);
+        this.sprite.setData('originalY', originalY);
+        this.sprite.setDepth(originalY);
+        this.sprite.setScale(1);
         this.healthBar = null;
         this.createHealthBar();
     }
@@ -77,13 +81,7 @@ export class Unit {
     }
 
     attack(target, moveType) {
-        if (moveType === 'attack') {
-            this.animationController.playAttackAnimation(target, () => {
-                target.takeDamage(this.stats.physicalDamage, this);
-            });
-        } else {
-            target.takeDamage(this.stats.physicalDamage, this);
-        }
+        target.takeDamage(this.stats.physicalDamage, this);
     }
 
     takeDamage(amount, attacker = null) {

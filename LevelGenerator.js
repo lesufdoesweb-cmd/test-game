@@ -1,7 +1,7 @@
 export class LevelGenerator {
     static generate(config) {
-        const width = 128;
-        const height = 128;
+        const width = 16;
+        const height = 16;
         const baseTileIds = [10, 11, 12]; // New IDs for base tiles
         const grid = [];
 

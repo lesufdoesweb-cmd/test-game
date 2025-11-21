@@ -22,10 +22,11 @@ export class ActionUI extends Phaser.Scene {
         this.apText = this.add.text(20, this.scale.height - 60, '', { fontSize: '48px', fill: '#fff', fontFamily: 'Pixelify-Sans' }).setDepth(10002);
 
         this.gameScene.events.on('player_turn_started', (player) => this.showActions(player), this);
+        this.gameScene.events.on('player_unit_selected', (unit) => this.showActions(unit), this);
         this.gameScene.events.on('player_action_selected', this.showCancelUI, this);
         this.gameScene.events.on('player_turn_ended', this.hideAll, this);
-        this.gameScene.events.on('action_cancelled', () => this.showActions(this.gameScene.player), this);
-        this.gameScene.events.on('player_action_completed', () => this.showActions(this.gameScene.player), this);
+        this.gameScene.events.on('action_cancelled', () => this.showActions(this.gameScene.activePlayerUnit), this);
+        this.gameScene.events.on('player_action_completed', () => this.showActions(this.gameScene.activePlayerUnit), this);
 
         this.input.on('dragstart', (pointer, gameObject) => {
             if (!gameObject.getData('isDraggable')) return;
@@ -179,13 +180,11 @@ export class ActionUI extends Phaser.Scene {
         this.skipTurnButton.setVisible(true);
         this.apText.setText(`AP: ${unit.stats.currentAp}/${unit.stats.maxAp}`);
 
-        if (this.abilities.length === 0) {
-            this.abilities = unit.moves.map((move, index) => ({
-                key: move.type, name: move.name, moveData: move
-            }));
-            for (let i = unit.moves.length; i < 6; i++) {
-                this.abilities.push(null);
-            }
+        this.abilities = unit.moves.map((move, index) => ({
+            key: move.type, name: move.name, moveData: move
+        }));
+        for (let i = unit.moves.length; i < 6; i++) {
+            this.abilities.push(null);
         }
 
         this.refreshActionBar(unit);

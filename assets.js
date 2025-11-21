@@ -6,9 +6,9 @@ export default {
     //     },
     // },
     'image': {
-        knight: {
-            key: 'knight',
-            args: ['src/assets/sprites/units/knight.png']
+        archer: {
+            key: 'archer',
+            args: ['src/assets/units/archer.png']
         },
         button_background: {
             key: 'button_background',
@@ -32,15 +32,15 @@ export default {
         },
         base_1: {
             key: 'base_1',
-            args: ['src/assets/tiles/base_1.png']
+            args: ['src/assets/better_tiles/forest_tile.png']
         },
         base_2: {
             key: 'base_2',
-            args: ['src/assets/tiles/base_2.png']
+            args: ['src/assets/better_tiles/forest_tile.png']
         },
         base_3: {
             key: 'base_3',
-            args: ['src/assets/tiles/base_3.png']
+            args: ['src/assets/better_tiles/forest_tile.png']
         },
         dirt_1: {
             key: 'dirt_1',

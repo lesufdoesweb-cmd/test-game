@@ -10,14 +10,15 @@ export class Game extends Phaser.Scene {
     constructor() {
         super('Game');
         this.easystar = null;
-        this.player = null; // This will hold the player Unit object
+        this.activePlayerUnit = null;
+        this.playerUnits = [];
         this.units = []; // This will hold all Unit objects
         this.grid = [];
         this.origin = {x: 0, y: 0};
         this.mapConsts = {
             MAP_SIZE_X: 0,
             MAP_SIZE_Y: 0,
-            TILE_WIDTH: 62,
+            TILE_WIDTH: 48,
             HALF_WIDTH: 0,
             QUARTER_HEIGHT: 0,
         }
@@ -27,6 +28,7 @@ export class Game extends Phaser.Scene {
         this.turnIndex = 0;
         this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
         this.vignette = null;
+        this.activeUnitTween = null;
         this.isMoving = false; // ensure defined
         this.isMiddleButtonDown = false;
         this.lastCameraX = 0;
@@ -84,16 +86,29 @@ export class Game extends Phaser.Scene {
 
             switch (obj.type) {
                 case 'player_start':
-                    this.player = new Unit(this, {
+                    const archer1 = new Unit(this, {
                         gridX: obj.position.x,
                         gridY: obj.position.y,
-                        texture: ASSETS.image.knight.key,
-                        name: 'Knight',
-                        stats: {maxHealth: 120, currentHealth: 120, moveRange: 4, physicalDamage: 25, speed: 10}
+                        texture: ASSETS.image.archer.key,
+                        name: 'Archer',
+                        stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
+                        isPlayer: true
                     });
-                    this.units.push(this.player);
-                    this.player.animationController.playIdleAnimation();
-                    this.makeUnitInteractive(this.player);
+                    this.units.push(archer1);
+                    this.playerUnits.push(archer1);
+                    this.makeUnitInteractive(archer1);
+
+                    const archer2 = new Unit(this, {
+                        gridX: obj.position.x + 1,
+                        gridY: obj.position.y,
+                        texture: ASSETS.image.archer.key,
+                        name: 'Archer',
+                        stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
+                        isPlayer: true
+                    });
+                    this.units.push(archer2);
+                    this.playerUnits.push(archer2);
+                    this.makeUnitInteractive(archer2);
                     break;
                 case 'enemy':
                     if (obj.enemyType === 'Orc') {
@@ -141,34 +156,17 @@ export class Game extends Phaser.Scene {
         });
 
 
-        // Orc animations
-        this.anims.create({
-            key: 'orc_idle',
-            frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, {start: 26, end: 29}),
-            frameRate: 4,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'orc_walk',
-            frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, {start: 30, end: 37}),
-            frameRate: 24,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'orc_attack',
-            frames: this.anims.generateFrameNumbers(ASSETS.spritesheet.basic_unit.key, {start: 38, end: 40}),
-            frameRate: 12,
-            repeat: 0
-        });
-
+        // Orc animations removed as per request for programmatic animation
         this.units.forEach(u => {
-            if (u !== this.player) u.sprite.play('orc_idle');
+            if (!u.isPlayer) {
+                // Future programmatic idle animation can go here
+            }
         });
 
         // --- Camera and Input ---
         this.cameras.main.setZoom(4.5);
         this.cameras.main.setRoundPixels(true);
-        this.cameras.main.centerOn(this.player.sprite.x, this.player.sprite.y);
+        this.cameras.main.centerOn(this.playerUnits[0].sprite.x, this.playerUnits[0].sprite.y);
 
         // --- Start Game ---
         this.buildTurnOrder();
@@ -179,14 +177,14 @@ export class Game extends Phaser.Scene {
 
         // --- Event Listeners ---
         this.events.on('unit_stats_changed', (unit) => {
-            if (unit === this.player) {
+            if (this.playerUnits.includes(unit)) {
                 this.events.emit('player_stats_changed', unit);
             }
         });
         this.events.on('action_selected', this.onActionSelected, this);
         this.events.on('unit_died', this.onUnitDied, this);
         this.events.on('action_cancelled', this.cancelPlayerAction, this);
-        this.events.on('skip_turn', this.endPlayerTurn, this);
+        this.events.on('skip_turn', this.endFullPlayerTurn, this);
 
         // --- Particle Effects ---
         const particleG = this.add.graphics();
@@ -268,16 +266,16 @@ export class Game extends Phaser.Scene {
                     return;
                 }
                 const unitOnTile = this.units.find(u => u.gridPos.x === targetX && u.gridPos.y === targetY);
-                if (unitOnTile && unitOnTile !== this.player) {
+                if (unitOnTile) {
                     return;
                 }
                 if (this.walkableTiles.includes(this.grid[targetY][targetX])) {
-                    this.movePlayer(targetX, targetY);
+                    this.moveUnit(this.activePlayerUnit, targetX, targetY);
                 }
             } else if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
                 const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 const targetUnit = this.getUnitAtScreenPos(worldPoint.x, worldPoint.y);
-                if (targetUnit && targetUnit !== this.player && targetUnit.sprite.tint === 0xff0000) {
+                if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tint === 0xff0000) {
                     this.performPlayerAttack(targetUnit);
                 }
             }
@@ -312,32 +310,23 @@ export class Game extends Phaser.Scene {
     }
 
     performPlayerAttack(targetUnit) {
-        const move = this.player.moves.find(m => m.type === this.playerActionState);
-        this.player.stats.currentAp -= move.cost;
-        this.events.emit('unit_stats_changed', this.player);
+        const move = this.activePlayerUnit.moves.find(m => m.type === this.playerActionState);
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
-        this.player.usedStandardAction = true;
+        this.activePlayerUnit.usedStandardAction = true;
 
-        if (this.playerActionState === 'long_attack') {
-            this.player.animationController.playCastAnimation(() => {
-                this.player.attack(targetUnit, this.playerActionState);
-                this.clearHighlights();
-                this.playerActionState = 'SELECTING_ACTION';
-                this.events.emit('player_action_completed');
-            });
-        } else {
-            this.player.attack(targetUnit, this.playerActionState);
-            this.clearHighlights();
-            this.playerActionState = 'SELECTING_ACTION';
-            this.events.emit('player_action_completed');
-        }
+        this.activePlayerUnit.attack(targetUnit, this.playerActionState);
+        this.clearHighlights();
+        this.playerActionState = 'SELECTING_ACTION';
+        this.events.emit('player_action_completed');
     }
 
     update(time, delta) {
         this.units.forEach(u => u.update());
-        if (this.vignette && this.player) {
-            this.vignette.x = this.player.sprite.x;
-            this.vignette.y = this.player.sprite.y;
+        if (this.vignette && this.activePlayerUnit) {
+            this.vignette.x = this.activePlayerUnit.sprite.x;
+            this.vignette.y = this.activePlayerUnit.sprite.y;
         }
     }
 
@@ -366,29 +355,29 @@ export class Game extends Phaser.Scene {
         return graphics;
     }
 
-    movePlayer(targetX, targetY) {
+    moveUnit(unit, targetX, targetY) {
         if (this.isMoving) {
             return;
         }
         this.clearHighlights();
 
-        this.units.forEach(unit => {
-            if (unit !== this.player) {
-                this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+        this.units.forEach(otherUnit => {
+            if (otherUnit !== unit) {
+                this.easystar.avoidAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
             }
         });
 
-        this.easystar.findPath(this.player.gridPos.x, this.player.gridPos.y, targetX, targetY, (path) => {
+        this.easystar.findPath(unit.gridPos.x, unit.gridPos.y, targetX, targetY, (path) => {
             if (path && path.length > 1) {
-                const truncatedPath = path.slice(0, Math.min(path.length, this.player.stats.moveRange + 1));
-                this.moveCharacterAlongPath(this.player, truncatedPath);
+                const truncatedPath = path.slice(0, Math.min(path.length, unit.stats.moveRange + 1));
+                this.moveCharacterAlongPath(unit, truncatedPath);
             } else {
                 console.log("Path was not found or is too short.");
             }
 
-            this.units.forEach(unit => {
-                if (unit !== this.player) {
-                    this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+            this.units.forEach(otherUnit => {
+                if (otherUnit !== unit) {
+                    this.easystar.stopAvoidingAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
                 }
             });
         });
@@ -402,45 +391,75 @@ export class Game extends Phaser.Scene {
         }
 
         this.isMoving = true;
-        unit.animationController.stopAllAnimations();
 
-        if (unit === this.player) {
+        if (unit.isPlayer) {
             this.events.emit('player_action_selected');
-        } else {
-            unit.sprite.play(unit.name.toLowerCase() + '_walk');
         }
 
         const screenPath = path.map(pos => ({
             x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
-            y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT - 14,
+            y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT - 24,
         }));
 
-        unit.animationController.playMoveAnimation(screenPath, () => {
-            const lastPos = path[path.length - 1];
-            unit.gridPos.x = lastPos.x;
-            unit.gridPos.y = lastPos.y;
-            this.isMoving = false;
+        const movementPath = new Phaser.Curves.Path(screenPath[0].x, screenPath[0].y);
+        for (let i = 1; i < screenPath.length; i++) {
+            movementPath.lineTo(screenPath[i].x, screenPath[i].y);
+        }
 
-            if (unit === this.player) {
-                // spend AP
-                const move = this.player.moves.find(m => m.type === 'move');
-                if (move) {
-                    this.player.stats.currentAp -= move.cost;
-                    move.currentCooldown = move.cooldown;
+        const duration = 200 * (path.length - 1);
+        const follower = { t: 0, vec: new Phaser.Math.Vector2() };
+
+        this.tweens.add({
+            targets: follower,
+            t: 1,
+            duration: duration,
+            ease: 'Linear',
+            onUpdate: () => {
+                movementPath.getPoint(follower.t, follower.vec);
+                unit.sprite.setPosition(follower.vec.x, follower.vec.y);
+            },
+            onComplete: () => {
+                const lastPos = path[path.length - 1];
+                unit.gridPos.x = lastPos.x;
+                unit.gridPos.y = lastPos.y;
+                this.isMoving = false;
+
+                // Stop any existing selection tween on this unit
+                if (this.activeUnitTween && this.activePlayerUnit === unit) {
+                    this.activeUnitTween.stop();
                 }
 
-                this.player.hasMoved = true;
+                // Update the 'originalY' for the new position
+                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT - 24;
+                unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
+                unit.sprite.setData('originalY', newOriginalY);
 
-                this.events.emit('unit_stats_changed', this.player);
-                this.events.emit('player_action_completed');
-                this.playerActionState = 'SELECTING_ACTION';
-                unit.animationController.playIdleAnimation();
+                if (unit.isPlayer) {
+                    const move = unit.moves.find(m => m.type === 'move');
+                    if (move) {
+                        unit.stats.currentAp -= move.cost;
+                        move.currentCooldown = move.cooldown;
+                    }
+                    unit.hasMoved = true;
+                    this.events.emit('unit_stats_changed', unit);
+                    this.events.emit('player_action_completed');
+                    this.playerActionState = 'SELECTING_ACTION';
 
-            } else {
-                unit.sprite.play(unit.name.toLowerCase() + '_idle');
+                    // If this unit is still the active one, restart its bobbing tween
+                    if (this.activePlayerUnit === unit) {
+                        this.activeUnitTween = this.tweens.add({
+                            targets: this.activePlayerUnit.sprite,
+                            y: newOriginalY - 5,
+                            duration: 500,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                    }
+                }
+
+                if (onCompleteCallback) onCompleteCallback();
             }
-
-            if (onCompleteCallback) onCompleteCallback();
         });
     }
 
@@ -458,53 +477,94 @@ export class Game extends Phaser.Scene {
 
     startNextTurn() {
         if (this.turnOrder.length === 0) return;
+
         if (this.turnIndex >= this.turnOrder.length) {
             this.turnIndex = 0;
+            // New round is starting, update all cooldowns
+            this.units.forEach(unit => this.updateCooldowns(unit));
         }
+
         const currentUnit = this.turnOrder[this.turnIndex];
         this.events.emit('turn_changed', this.turnIndex);
 
-        if (currentUnit === this.player) {
-            this.startPlayerTurn();
+        if (currentUnit.isPlayer) {
+            this.startPlayerUnitTurn(currentUnit);
         } else {
             this.startEnemyTurn(currentUnit);
         }
     }
 
-    startPlayerTurn() {
-        this.gameState = 'PLAYER_TURN';
-        this.playerActionState = 'SELECTING_ACTION'; // No action selected initially
-        this.updateCooldowns(this.player);
-        this.player.stats.currentAp = this.player.stats.maxAp;
-        this.player.hasMoved = false;
-        this.player.usedStandardAction = false;
-        this.events.emit('unit_stats_changed', this.player);
-        this.events.emit('player_turn_started', this.player);
+    deactivateCurrentPlayerUnitSelection() {
+        if (this.activeUnitTween) {
+            this.activeUnitTween.stop();
+        }
+        if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
+            this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
+        }
+        this.activePlayerUnit = null;
+        this.playerActionState = null;
+        this.clearHighlights(); // Also clear highlights when deselecting
     }
 
-    endPlayerTurn() {
+    startPlayerUnitTurn(unit) {
+        this.deactivateCurrentPlayerUnitSelection();
+        this.gameState = 'PLAYER_TURN';
+        this.playerActionState = 'SELECTING_ACTION';
+        this.activePlayerUnit = unit;
+        this.activePlayerUnit.stats.currentAp = this.activePlayerUnit.stats.maxAp;
+        this.activePlayerUnit.hasMoved = false;
+        this.activePlayerUnit.usedStandardAction = false;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        this.events.emit('player_turn_started', this.activePlayerUnit);
+    }
+
+    endFullPlayerTurn() {
         this.clearHighlights();
         this.playerActionState = null;
+        if (this.activeUnitTween) {
+            this.activeUnitTween.stop();
+            if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
+                 this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
+            }
+        }
+        this.activePlayerUnit = null;
+        this.playerUnits.forEach(unit => this.updateCooldowns(unit));
         this.events.emit('player_turn_ended');
-        this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
+
+        // Find the next enemy in the turn order, starting from the current position
+        let nextIndex = (this.turnIndex + 1) % this.turnOrder.length;
+        let looped = false;
+        while (nextIndex !== this.turnIndex || !looped) {
+            if(nextIndex === this.turnIndex) looped = true;
+            if (!this.turnOrder[nextIndex].isPlayer) {
+                this.turnIndex = nextIndex;
+                this.startNextTurn();
+                return;
+            }
+            nextIndex = (nextIndex + 1) % this.turnOrder.length;
+        }
+
+        // If no enemy was found in a full loop, it means there are no enemies.
+        // We should start the next round with the first unit.
+        this.turnIndex = 0;
         this.startNextTurn();
     }
 
     onActionSelected(move) {
         if (move.currentCooldown > 0) return;
-        if (move.type === 'attack' && this.player.usedStandardAction) return;
-        if (move.type === 'long_attack' && this.player.usedStandardAction) return;
-        if (move.type === 'move' && this.player.hasMoved) return;
-        if (this.player.stats.currentAp < move.cost) return;
+        if (move.type === 'attack' && this.activePlayerUnit.usedStandardAction) return;
+        if (move.type === 'long_attack' && this.activePlayerUnit.usedStandardAction) return;
+        if (move.type === 'move' && this.activePlayerUnit.hasMoved) return;
+        if (this.activePlayerUnit.stats.currentAp < move.cost) return;
 
         this.playerActionState = move.type;
         this.events.emit('player_action_selected');
 
         if (move.type === 'attack' || move.type === 'long_attack') {
-            this.highlightRange(this.player.gridPos, move.range, 0xff0000);
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0xff0000);
             this.highlightAttackableEnemies(move.range);
         } else if (move.type === 'move') {
-            this.highlightRange(this.player.gridPos, move.range, 0x0000ff);
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x0000ff);
         }
     }
 
@@ -526,7 +586,7 @@ export class Game extends Phaser.Scene {
         const enemyPositions = new Set();
         if (color === 0x0000ff) { // Only avoid enemies for move highlights
             this.units.forEach(unit => {
-                if (unit !== this.player) {
+                if (unit !== this.activePlayerUnit) {
                     enemyPositions.add(`${unit.gridPos.x},${unit.gridPos.y}`);
                 }
             });
@@ -567,9 +627,9 @@ export class Game extends Phaser.Scene {
     }
 
     highlightAttackableEnemies(range) {
-        const enemies = this.units.filter(u => u !== this.player);
+        const enemies = this.units.filter(u => !u.isPlayer);
         for (const enemy of enemies) {
-            const distance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+            const distance = Math.abs(this.activePlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(this.activePlayerUnit.gridPos.y - enemy.gridPos.y);
             if (distance <= range) {
                 enemy.sprite.setTint(0xff0000);
             }
@@ -595,7 +655,6 @@ export class Game extends Phaser.Scene {
 
     startEnemyTurn(enemy) {
         this.gameState = 'ENEMY_TURN';
-        this.updateCooldowns(enemy);
         this.takeEnemyTurn(enemy, () => {
             this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
             this.startNextTurn();
@@ -605,35 +664,51 @@ export class Game extends Phaser.Scene {
     takeEnemyTurn(enemy, onTurnComplete) {
         const attackMove = enemy.moves.find(m => m.type === 'attack');
 
+        // Find the closest player unit
+        let closestPlayerUnit = null;
+        let minDistance = Infinity;
+        for (const playerUnit of this.playerUnits) {
+            const distance = Math.abs(playerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(playerUnit.gridPos.y - enemy.gridPos.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPlayerUnit = playerUnit;
+            }
+        }
+
+        if (!closestPlayerUnit) {
+            onTurnComplete();
+            return;
+        }
+
         const doAttack = (callback) => {
-            const dx = this.player.gridPos.x - enemy.gridPos.x;
-            const dy = this.player.gridPos.y - enemy.gridPos.y;
+            const dx = closestPlayerUnit.gridPos.x - enemy.gridPos.x;
+            const dy = closestPlayerUnit.gridPos.y - enemy.gridPos.y;
             if (dx < 0 || (dx === 0 && dy < 0)) {
                 enemy.sprite.flipX = true;
             } else {
                 enemy.sprite.flipX = false;
             }
 
-            enemy.attack(this.player, 'attack');
+            enemy.attack(closestPlayerUnit, 'attack');
             if (callback) {
                 this.time.delayedCall(300, callback, []);
             }
         };
 
-        const distance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+        const distanceToTarget = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
 
-        if (distance <= attackMove.range) {
+        if (distanceToTarget <= attackMove.range) {
             doAttack(onTurnComplete);
         } else {
             const targetableTiles = [];
             const neighbors = [
-                {x: this.player.gridPos.x + 1, y: this.player.gridPos.y}, {
-                    x: this.player.gridPos.x - 1,
-                    y: this.player.gridPos.y
+                {x: closestPlayerUnit.gridPos.x + 1, y: closestPlayerUnit.gridPos.y}, {
+                    x: closestPlayerUnit.gridPos.x - 1,
+                    y: closestPlayerUnit.gridPos.y
                 },
-                {x: this.player.gridPos.x, y: this.player.gridPos.y + 1}, {
-                    x: this.player.gridPos.x,
-                    y: this.player.gridPos.y - 1
+                {x: closestPlayerUnit.gridPos.x, y: closestPlayerUnit.gridPos.y + 1}, {
+                    x: closestPlayerUnit.gridPos.x,
+                    y: closestPlayerUnit.gridPos.y - 1
                 }
             ];
 
@@ -664,7 +739,7 @@ export class Game extends Phaser.Scene {
                     if (path && path.length > 1) {
                         const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
                         this.moveCharacterAlongPath(enemy, truncatedPath, () => {
-                            const newDistance = Math.abs(this.player.gridPos.x - enemy.gridPos.x) + Math.abs(this.player.gridPos.y - enemy.gridPos.y);
+                            const newDistance = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
                             if (newDistance <= attackMove.range) {
                                 doAttack(onTurnComplete);
                             } else {
@@ -689,11 +764,18 @@ export class Game extends Phaser.Scene {
 
 
     onUnitDied(unit) {
-        if (unit === this.player) {
-            this.scene.stop('ActionUI');
-            this.scene.stop('TimelineUI');
-            this.scene.start('GameOver');
-            return;
+        if (unit.isPlayer) {
+            const playerUnitIndex = this.playerUnits.indexOf(unit);
+            if (playerUnitIndex > -1) {
+                this.playerUnits.splice(playerUnitIndex, 1);
+            }
+
+            if (this.playerUnits.length === 0) {
+                this.scene.stop('ActionUI');
+                this.scene.stop('TimelineUI');
+                this.scene.start('GameOver');
+                return;
+            }
         }
 
         const unitIndex = this.units.indexOf(unit);
@@ -708,32 +790,80 @@ export class Game extends Phaser.Scene {
         this.events.emit('turn_changed', this.turnIndex);
     }
 
-    makeUnitInteractive(unit) {
-        unit.sprite.setInteractive({useHandCursor: true});
+        makeUnitInteractive(unit) {
+        unit.sprite.setInteractive({ useHandCursor: true });
 
-        unit.sprite.on('pointerover', () => {
-            if (unit === this.player) {
-                if (this.isMoving) return;
-                unit.animationController.stopAllAnimations();
-            }
-            const actionUI = this.scene.get('ActionUI');
-            if (!actionUI) return;
-
-            const stats = unit.stats;
-            const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
-
-            actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
-        });
-
-        unit.sprite.on('pointerout', () => {
-            if (unit === this.player) {
-                if (!this.isMoving) {
-                    unit.animationController.playIdleAnimation();
+        // Player unit specific interactions
+        if (unit.isPlayer) {
+                    unit.sprite.on('pointerdown', () => {
+                        // If we're clicking the same unit that's already active, do nothing.
+                        if (this.activePlayerUnit === unit) return;
+            
+                        // Deactivate the currently active player unit's state
+                        this.deactivateCurrentPlayerUnitSelection();
+            
+                        // If the unit being clicked had a hover tween, stop it
+                        if (unit.hoverTween) {
+                            unit.hoverTween.stop();
+                            unit.hoverTween = null;
+                        }
+            
+                        // Set the new active unit
+                        this.activePlayerUnit = unit;
+                        this.events.emit('player_unit_selected', unit);
+            
+                        // Start the bobbing selection tween for the new active unit.
+                        this.activeUnitTween = this.tweens.add({
+                            targets: this.activePlayerUnit.sprite,
+                            y: this.activePlayerUnit.sprite.getData('originalY') - 5,
+                            duration: 500,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                    });
                 }
-            }
-            const actionUI = this.scene.get('ActionUI');
-            if (!actionUI) return;
-            actionUI.hideGameTooltip();
-        });
-    }
-}
+            
+                // Hover effects for all units
+                unit.sprite.on('pointerover', () => {
+                    // Only apply hover effect if it's a player unit AND not the currently active one
+                    if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                        // If there's an existing hover tween, stop it first to prevent conflicts
+                        if (unit.hoverTween) {
+                            unit.hoverTween.stop();
+                        }
+                        // Start the bobbing hover tween
+                        unit.hoverTween = this.tweens.add({
+                            targets: unit.sprite,
+                            y: unit.sprite.getData('originalY') - 5, // Float up slightly
+                            duration: 500,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                    }
+                    
+                    const actionUI = this.scene.get('ActionUI');
+                    if (!actionUI) return;
+            
+                    const stats = unit.stats;
+                    const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
+                    actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
+                });
+            
+                unit.sprite.on('pointerout', () => {
+                    // Only reset hover effect if it's a player unit AND not the currently active one
+                    if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                        if (unit.hoverTween) {
+                            unit.hoverTween.stop();
+                            unit.hoverTween = null; // Clear the reference
+                        }
+                        // Reset the Y position to its original
+                        unit.sprite.setY(unit.sprite.getData('originalY'));
+                    }
+            
+                    const actionUI = this.scene.get('ActionUI');
+                    if (!actionUI) return;
+                    actionUI.hideGameTooltip();
+                });
+            }}

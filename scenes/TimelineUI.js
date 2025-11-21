@@ -31,7 +31,7 @@ export class TimelineUI extends Phaser.Scene {
                 .setScale(bgScale);
 
             // Use a placeholder texture that exists
-            const portrait = this.add.sprite(x, y, ASSETS.image.knight.key);
+            const portrait = this.add.sprite(x, y, ASSETS.image.archer.key);
             portrait.setScale(3);
             portrait.setVisible(false); // Hide until updated with actual unit data
 
@@ -50,13 +50,7 @@ export class TimelineUI extends Phaser.Scene {
             const portrait = this.portraits[i];
 
             if (unit) {
-                if (unit.name === 'Knight') {
-                    portrait.sprite.setTexture(ASSETS.image.knight.key);
-                    portrait.sprite.setFrame(0); // Assuming knight.png is a single image or first frame
-                } else {
-                    portrait.sprite.setTexture(ASSETS.spritesheet.basic_unit.key);
-                    portrait.sprite.setFrame(unit.sprite.frame.name);
-                }
+                portrait.sprite.setTexture(unit.sprite.texture.key, unit.sprite.frame.name);
                 portrait.sprite.setVisible(true);
             } else {
                 portrait.sprite.setVisible(false); // Hide if no unit for this turn slot
