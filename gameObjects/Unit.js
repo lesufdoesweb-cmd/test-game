@@ -204,7 +204,7 @@ export class Unit {
         });
     }
 
-    takeDamage(damageInfo, attacker = null) {
+    takeDamage(damageInfo, attacker = null, move = null) {
         const { damage, isCrit } = damageInfo;
         let finalDamage = damage;
         
@@ -221,12 +221,27 @@ export class Unit {
         this.updateHealthBar();
         this.scene.events.emit('unit_stats_changed', this);
 
+        if (move && move.type === 'attack') {
+            const slashEffect = this.scene.add.sprite(this.sprite.x, this.sprite.y - 16, ASSETS.image.melee_slash_effect.key);
+            slashEffect.setDepth(this.sprite.depth + 1);
+            slashEffect.setScale(1);
+            slashEffect.setAngle(Phaser.Math.Between(0, 360));
+            this.scene.tweens.add({
+                targets: slashEffect,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    slashEffect.destroy();
+                }
+            });
+        }
+
         // Damage Number Text
         const damageString = Math.round(finalDamage).toString();
         const textColor = isCrit ? '#ffff00' : '#ff0000'; // Yellow for crit, red for normal
         const textStyle = {
             fontFamily: '"Pixelify Sans"',
-            fontSize: isCrit ? '20px' : '16px', // Larger font for crits
+            fontSize: isCrit ? '24px' : '20px', // Larger font for crits
             color: textColor,
             stroke: '#000000',
             strokeThickness: 2,
@@ -239,9 +254,9 @@ export class Unit {
         this.scene.tweens.add({
             targets: damageText,
             x: damageText.x + 30,
-            y: damageText.y - (isCrit ? 50 : 40),
+            y: damageText.y - (isCrit ? 60 : 50),
             alpha: 0,
-            duration: isCrit ? 1500 : 1200, // Lasts a bit longer for crits
+            duration: isCrit ? 2000 : 1600, // Lasts a bit longer for crits
             ease: 'Power1',
             onComplete: () => {
                 damageText.destroy();

@@ -19,9 +19,9 @@ export const ABILITIES = {
         currentCooldown: 0,
         icon: ASSETS.image.basic_attack_icon.key
     },
-    'LONG_ATTACK': {
-        name: 'Attack',
-        type: 'long_attack',
+'ARROW_ATTACK': {
+        name: 'Arrow Attack',
+        type: 'arrow_attack',
         range: 4,
         cost: 1,
         cooldown: 1,

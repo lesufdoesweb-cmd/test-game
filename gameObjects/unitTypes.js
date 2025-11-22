@@ -15,7 +15,7 @@ export const UNIT_TYPES = {
             critChance: 0.05,
             critDamageMultiplier: 1.5
         },
-        moves: ['MOVE', 'LONG_ATTACK']
+        moves: ['MOVE', 'ARROW_ATTACK']
     },
     'Orc': {
         name: 'Orc',
@@ -41,7 +41,7 @@ export const UNIT_TYPES = {
             currentHealth: 60,
             moveRange: 5,
             physicalDamage: 25,
-            speed: 14,
+            speed: 2,
             critChance: 0.05,
             critDamageMultiplier: 1.5
         },

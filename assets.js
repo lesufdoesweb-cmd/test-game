@@ -85,6 +85,14 @@ export default {
         armor_up_icon: {
             key: 'armor_up_icon',
             args: ['src/assets/ability_icons/armor_up.png']
+        },
+        arrow_projectile: {
+            key: 'arrow_projectile',
+            args: ['src/assets/projectiles/arrow.png']
+        },
+        melee_slash_effect: {
+            key: 'melee_slash_effect',
+            args: ['src/assets/projectiles/melee_slash.png']
         }
     },
     'spritesheet': {

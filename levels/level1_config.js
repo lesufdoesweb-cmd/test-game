@@ -18,5 +18,6 @@ export const level1Config = {
         { type: 'unit', unitType: 'Orc', position: { x: 5, y: 5 } },
         { type: 'unit', unitType: 'Spider', position: { x: 4, y: 5 } },
         { type: 'unit', unitType: 'Spider', position: { x: 6, y: 5 } },
+        { type: 'unit', unitType: 'Spider', position: { x: 7, y: 5 } },
     ]
 };

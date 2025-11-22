@@ -7,6 +7,7 @@ import {Chest} from '../gameObjects/Chest.js';
 import {NPC} from '../gameObjects/NPC.js';
 import {UNIT_TYPES} from "../gameObjects/unitTypes.js";
 import {ABILITIES} from "../gameObjects/abilities.js";
+import {Projectile} from "../gameObjects/Projectile.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -328,19 +329,33 @@ export class Game extends Phaser.Scene {
     performPlayerAttack(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
-        
+
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
         this.activePlayerUnit.usedStandardAction = true;
-    
-        this.activePlayerUnit.attack(targetUnit, () => {
+
+        const onHit = () => {
             const damageInfo = this.activePlayerUnit.calculateDamage(targetUnit);
-            targetUnit.takeDamage(damageInfo, this.activePlayerUnit);
+            targetUnit.takeDamage(damageInfo, this.activePlayerUnit, move);
             this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
-        });
+        };
+
+        if (move.type === 'arrow_attack') {
+            const projectile = new Projectile(
+                this,
+                this.activePlayerUnit.sprite.x,
+                this.activePlayerUnit.sprite.y - 24, // Start from near the unit's head
+                ASSETS.image.arrow_projectile.key,
+                targetUnit.sprite,
+                onHit
+            );
+            projectile.setDepth(9999);
+        } else {
+            this.activePlayerUnit.attack(targetUnit, onHit);
+        }
     }
     update(time, delta) {
         this.units.forEach(u => u.update());
@@ -356,7 +371,7 @@ export class Game extends Phaser.Scene {
         }
 
         const actionState = this.playerActionState;
-        if (actionState === 'move' || actionState === 'attack' || actionState === 'long_attack') {
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack') {
             const pointer = this.input.activePointer;
             const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
@@ -701,7 +716,7 @@ export class Game extends Phaser.Scene {
     onActionSelected(move) {
         if (move.currentCooldown > 0) return;
         if (move.type === 'attack' && this.activePlayerUnit.usedStandardAction) return;
-        if (move.type === 'long_attack' && this.activePlayerUnit.usedStandardAction) return;
+        if (move.type === 'arrow_attack' && this.activePlayerUnit.usedStandardAction) return;
         if (move.type === 'move' && this.activePlayerUnit.hasMoved) return;
         if (this.activePlayerUnit.stats.currentAp < move.cost) return;
 
@@ -709,7 +724,7 @@ export class Game extends Phaser.Scene {
         this.playerActionState = move.type;
         this.events.emit('player_action_selected');
 
-        if (move.type === 'attack' || move.type === 'long_attack') {
+        if (move.type === 'attack' || move.type === 'arrow_attack') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0xff0000);
             this.highlightAttackableEnemies(move.range);
         } else if (move.type === 'move') {
@@ -857,7 +872,7 @@ export class Game extends Phaser.Scene {
 
             enemy.attack(closestPlayerUnit, () => {
                 const damageInfo = enemy.calculateDamage(closestPlayerUnit);
-                closestPlayerUnit.takeDamage(damageInfo, enemy);
+                closestPlayerUnit.takeDamage(damageInfo, enemy, attackMove);
                 if (callback) {
                     this.time.delayedCall(300, callback, []);
                 }
@@ -980,7 +995,7 @@ export class Game extends Phaser.Scene {
                 // If the target is invalid, do nothing, forcing a cancel.
                 return;
             }
-            if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
+            if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
                 if (!unit.isPlayer && unit.sprite.tint === 0xff0000) {
                     this.performPlayerAttack(unit);
                 }

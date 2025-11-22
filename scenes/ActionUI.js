@@ -212,7 +212,7 @@ export class ActionUI extends Phaser.Scene {
         let isEnabled = true;
         if (move.currentCooldown > 0) isEnabled = false;
         if (move.type === 'move' && unit.hasMoved) isEnabled = false;
-        if ((move.type === 'attack' || move.type === 'long_attack') && unit.usedStandardAction) isEnabled = false;
+        if ((move.type === 'attack' || move.type === 'arrow_attack') && unit.usedStandardAction) isEnabled = false;
         if (unit.stats.currentAp < move.cost) isEnabled = false;
 
         const scale = 2; // Icons are 32x32, this makes them 64x64
