@@ -14,11 +14,19 @@ export class Unit {
             speed: 10,
             maxAp: 1,
             currentAp: 1,
+            critChance: 0.05,
+            critDamageMultiplier: 1.5,
             ...stats
         };
 
+        // Defensive checks to prevent NaN values from bad config
+        if (typeof this.stats.physicalDamage !== 'number') this.stats.physicalDamage = 10;
+        if (typeof this.stats.critChance !== 'number') this.stats.critChance = 0.05;
+        if (typeof this.stats.critDamageMultiplier !== 'number') this.stats.critDamageMultiplier = 1.5;
+
         this.moves = moves;
         this.statusEffects = [];
+        this.armorUpEmitter = null;
 
 
         this.gridPos = { x: gridX, y: gridY };
@@ -83,6 +91,52 @@ export class Unit {
         // This method will be called from the main game update loop
         this.sprite.setDepth(this.sprite.y + 16);
         this.updateHealthBar();
+
+        // Armor up effect particles
+        const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
+        if (armorUpEffect) {
+            if (!this.armorUpEmitter) {
+                const emitterWidth = this.sprite.displayWidth * 0.8;
+                const line = new Phaser.Geom.Line(-emitterWidth / 2, 0, emitterWidth / 2, 0);
+
+                this.armorUpEmitter = this.scene.add.particles(0, 0, 'particle', {
+                    speed: {min: 20, max: 40},
+                    angle: {min: -100, max: -80},
+                    scale: {start: 4, end: 0},
+                    alpha: {start: 0.6, end: 0},
+                    lifespan: 2000,
+                    tint: [0x87CEEB, 0x4682B4, 0x6495ED],
+                    frequency: 50,
+                    emitZone: {type: 'random', source: line}
+                });
+                this.armorUpEmitter.setDepth(this.sprite.depth - 1);
+            }
+            this.armorUpEmitter.setPosition(this.sprite.x, this.sprite.y);
+            this.armorUpEmitter.setDepth(99999);
+            if (!this.armorUpEmitter.emitting) {
+                this.armorUpEmitter.start();
+            }
+        } else {
+            if (this.armorUpEmitter && this.armorUpEmitter.emitting) {
+                this.armorUpEmitter.stop();
+            }
+        }
+    }
+
+    calculateDamage(targetUnit) {
+        const baseDamage = this.stats.physicalDamage;
+        
+        // 1. Damage Variance (+/- 20%)
+        const variance = (Math.random() - 0.5) * 0.4; // -0.2 to +0.2
+        let finalDamage = baseDamage * (1 + variance);
+
+        // 2. Critical Hit Check
+        const isCrit = Math.random() < this.stats.critChance;
+        if (isCrit) {
+            finalDamage *= this.stats.critDamageMultiplier;
+        }
+
+        return { damage: finalDamage, isCrit: isCrit };
     }
 
     attack(target, onComplete) {
@@ -150,8 +204,9 @@ export class Unit {
         });
     }
 
-    takeDamage(amount, attacker = null) {
-        let finalDamage = amount;
+    takeDamage(damageInfo, attacker = null) {
+        const { damage, isCrit } = damageInfo;
+        let finalDamage = damage;
         
         // Check for damage reduction effects
         const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
@@ -165,6 +220,59 @@ export class Unit {
         }
         this.updateHealthBar();
         this.scene.events.emit('unit_stats_changed', this);
+
+        // Damage Number Text
+        const damageString = Math.round(finalDamage).toString();
+        const textColor = isCrit ? '#ffff00' : '#ff0000'; // Yellow for crit, red for normal
+        const textStyle = {
+            fontFamily: '"Pixelify Sans"',
+            fontSize: isCrit ? '20px' : '16px', // Larger font for crits
+            color: textColor,
+            stroke: '#000000',
+            strokeThickness: 2,
+            align: 'center'
+        };
+        const damageText = this.scene.add.text(this.sprite.x, this.sprite.y - 30, damageString, textStyle);
+        damageText.setOrigin(0.5, 0.5);
+        damageText.setDepth(this.sprite.depth + 2);
+
+        this.scene.tweens.add({
+            targets: damageText,
+            x: damageText.x + 30,
+            y: damageText.y - (isCrit ? 50 : 40),
+            alpha: 0,
+            duration: isCrit ? 1500 : 1200, // Lasts a bit longer for crits
+            ease: 'Power1',
+            onComplete: () => {
+                damageText.destroy();
+            }
+        });
+
+        // Knockback tween
+        if (attacker && this.stats.currentHealth > 0) { // Only do knockback if unit survives
+            const originalX = this.sprite.x;
+            const originalY = this.sprite.y;
+
+            const dx = originalX - attacker.sprite.x;
+            const dy = originalY - attacker.sprite.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            const knockbackDistance = 8;
+
+            if (distance > 0) {
+                const moveX = originalX + (dx / distance) * knockbackDistance;
+                const moveY = originalY + (dy / distance) * knockbackDistance;
+
+                this.scene.tweens.add({
+                    targets: this.sprite,
+                    x: moveX,
+                    y: moveY,
+                    duration: 80,
+                    ease: 'Quad.easeOut',
+                    yoyo: true,
+                });
+            }
+        }
 
         // Emit particles event
         if (attacker) {
@@ -195,5 +303,8 @@ export class Unit {
     destroy() {
         this.sprite.destroy();
         this.healthBar.destroy();
+        if (this.armorUpEmitter) {
+            this.armorUpEmitter.destroy();
+        }
     }
 }

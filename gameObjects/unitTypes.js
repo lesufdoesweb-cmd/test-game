@@ -11,7 +11,9 @@ export const UNIT_TYPES = {
             currentHealth: 80,
             moveRange: 5,
             physicalDamage: 30,
-            speed: 12
+            speed: 12,
+            critChance: 0.05,
+            critDamageMultiplier: 1.5
         },
         moves: ['MOVE', 'LONG_ATTACK']
     },
@@ -24,7 +26,9 @@ export const UNIT_TYPES = {
             currentHealth: 100,
             moveRange: 3,
             physicalDamage: 35,
-            speed: 9
+            speed: 9,
+            critChance: 0.05,
+            critDamageMultiplier: 1.5
         },
         moves: ['MOVE', 'BASIC_ATTACK']
     },
@@ -37,7 +41,9 @@ export const UNIT_TYPES = {
             currentHealth: 60,
             moveRange: 5,
             physicalDamage: 25,
-            speed: 14
+            speed: 14,
+            critChance: 0.05,
+            critDamageMultiplier: 1.5
         },
         moves: ['MOVE', 'BASIC_ATTACK']
     },
@@ -50,7 +56,9 @@ export const UNIT_TYPES = {
             currentHealth: 150,
             moveRange: 4,
             physicalDamage: 40,
-            speed: 10
+            speed: 10,
+            critChance: 0.05,
+            critDamageMultiplier: 1.5
         },
         moves: ['MOVE', 'BASIC_ATTACK', 'ENHANCE_ARMOR']
     }

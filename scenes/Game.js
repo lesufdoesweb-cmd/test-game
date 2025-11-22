@@ -251,48 +251,34 @@ export class Game extends Phaser.Scene {
         });
 
 
-        this.input.on('pointerdown', (pointer, gameObjects) => {
-            if (pointer.rightButtonDown()) {
-                this.cancelPlayerAction();
-                return;
-            }
-
-            if (!pointer.leftButtonDown() || this.isMoving) {
-                return;
-            }
-
-            if (this.playerActionState === 'move') {
-                const gridPos = this.screenToGrid(pointer.worldX, pointer.worldY);
-                const targetX = gridPos.x;
-                const targetY = gridPos.y;
-
-                if (targetX < 0 || targetX >= this.mapConsts.MAP_SIZE_X || targetY < 0 || targetY >= this.mapConsts.MAP_SIZE_Y) {
-                    return;
-                }
-                const unitOnTile = this.units.find(u => u.gridPos.x === targetX && u.gridPos.y === targetY);
-                if (unitOnTile) {
-                    return;
-                }
-                if (this.walkableTiles.includes(this.grid[targetY][targetX])) {
-                    this.moveUnit(this.activePlayerUnit, targetX, targetY);
-                }
-            } else if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
-                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-                const targetUnit = this.getUnitAtScreenPos(worldPoint.x, worldPoint.y);
-                if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tint === 0xff0000) {
-                    this.performPlayerAttack(targetUnit);
-                }
-            }
-        });
-
-        // Camera drag with middle mouse button
         this.input.on('pointerdown', (pointer) => {
+            if (this.gameState !== 'PLAYER_TURN') return;
+
             if (pointer.middleButtonDown()) {
                 this.isMiddleButtonDown = true;
                 this.lastCameraX = this.cameras.main.scrollX;
                 this.lastCameraY = this.cameras.main.scrollY;
                 this.lastPointerX = pointer.x;
                 this.lastPointerY = pointer.y;
+                return;
+            }
+            if (pointer.rightButtonDown()) {
+                this.cancelPlayerAction();
+                return;
+            }
+            
+            // This global listener now only handles clicks on empty tiles, i.e., for moving.
+            if (pointer.leftButtonDown() && !this.isMoving && this.playerActionState === 'move') {
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
+        
+                if (gridPos.x >= 0 && gridPos.x < this.mapConsts.MAP_SIZE_X && gridPos.y >= 0 && gridPos.y < this.mapConsts.MAP_SIZE_Y) {
+                    // Check if the tile is valid for movement (from the highlights)
+                    const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
+                    if (isTileValid) {
+                        this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
+                    }
+                }
             }
         });
 
@@ -324,21 +310,38 @@ export class Game extends Phaser.Scene {
         });
     }
 
+    performEnhanceArmor(targetUnit) {
+        const move = this.activeMove;
+        if (!move) return;
+    
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+    
+        targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration });
+        
+        this.clearHighlights();
+        this.playerActionState = 'SELECTING_ACTION';
+        this.events.emit('player_action_completed');
+    }
+    
     performPlayerAttack(targetUnit) {
-        const move = this.activePlayerUnit.moves.find(m => m.type === this.playerActionState);
+        const move = this.activeMove;
+        if (!move) return;
+        
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
         this.activePlayerUnit.usedStandardAction = true;
-
+    
         this.activePlayerUnit.attack(targetUnit, () => {
-            targetUnit.takeDamage(this.activePlayerUnit.stats.physicalDamage, this.activePlayerUnit);
+            const damageInfo = this.activePlayerUnit.calculateDamage(targetUnit);
+            targetUnit.takeDamage(damageInfo, this.activePlayerUnit);
             this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
         });
     }
-
     update(time, delta) {
         this.units.forEach(u => u.update());
         if (this.vignette && this.activePlayerUnit) {
@@ -497,10 +500,11 @@ export class Game extends Phaser.Scene {
             return;
         }
 
-        this.isMoving = true;
-
-        if (unit.isPlayer) {
-            this.events.emit('player_action_selected');
+            this.isMoving = true;
+        
+            this.events.emit('unit_is_moving');
+        
+            if (unit.isPlayer) {            this.events.emit('player_action_selected');
         }
 
         const screenPath = path.map(pos => ({
@@ -615,7 +619,6 @@ export class Game extends Phaser.Scene {
         }
         this.activeUnitTween = null; // Clear the reference
         this.activePlayerUnit = null;
-        this.playerActionState = null;
         this.clearHighlights(); // Also clear highlights when deselecting
     }
 
@@ -702,6 +705,7 @@ export class Game extends Phaser.Scene {
         if (move.type === 'move' && this.activePlayerUnit.hasMoved) return;
         if (this.activePlayerUnit.stats.currentAp < move.cost) return;
 
+        this.activeMove = move;
         this.playerActionState = move.type;
         this.events.emit('player_action_selected');
 
@@ -711,17 +715,8 @@ export class Game extends Phaser.Scene {
         } else if (move.type === 'move') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x0000ff);
         } else if (move.type === 'enhance_armor') {
-            // This is a self-cast ability, no highlighting needed.
-            // Apply the effect immediately.
-            this.activePlayerUnit.addStatusEffect({ type: 'armor_up', duration: move.duration });
-
-            // Deduct AP, set cooldown, etc.
-            this.activePlayerUnit.stats.currentAp -= move.cost;
-            this.events.emit('unit_stats_changed', this.activePlayerUnit);
-            move.currentCooldown = move.cooldown;
-            
-            this.playerActionState = 'SELECTING_ACTION';
-            this.events.emit('player_action_completed');
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x00ff99); // Show ability range
+            this.highlightFriendlyTargets(move.range);
         }
     }
 
@@ -778,6 +773,16 @@ export class Game extends Phaser.Scene {
                     indicator.setDepth(neighbor.x + neighbor.y + 0.5);
                     this.rangeHighlights.push(indicator);
                 }
+            }
+        }
+    }
+
+    highlightFriendlyTargets(range) {
+        for (const unit of this.playerUnits) {
+            // A unit can cast on itself
+            const distance = Math.abs(this.activePlayerUnit.gridPos.x - unit.gridPos.x) + Math.abs(this.activePlayerUnit.gridPos.y - unit.gridPos.y);
+            if (distance <= range) {
+                unit.sprite.setTint(0x00ff00); // Green tint for valid targets
             }
         }
     }
@@ -851,7 +856,8 @@ export class Game extends Phaser.Scene {
             }
 
             enemy.attack(closestPlayerUnit, () => {
-                closestPlayerUnit.takeDamage(enemy.stats.physicalDamage, enemy);
+                const damageInfo = enemy.calculateDamage(closestPlayerUnit);
+                closestPlayerUnit.takeDamage(damageInfo, enemy);
                 if (callback) {
                     this.time.delayedCall(300, callback, []);
                 }
@@ -956,49 +962,75 @@ export class Game extends Phaser.Scene {
         makeUnitInteractive(unit) {
         unit.sprite.setInteractive({ useHandCursor: true });
 
-        // Player unit specific interactions
-        if (unit.isPlayer) {
-                                    unit.sprite.on('pointerdown', () => {
-                                        this.activatePlayerUnit(unit);
-                                    });                        }
-                    
-                        // Hover effects for all units
-                        unit.sprite.on('pointerover', () => {
-                            // Only apply hover effect if it's a player unit AND not the currently active one
-                            if (unit.isPlayer && this.activePlayerUnit !== unit) {
-                                // Kill any existing tweens to prevent conflicts before starting the new one.
-                                this.tweens.killTweensOf(unit.sprite);
-                    
-                                // Start the bobbing hover tween
-                                this.tweens.add({
-                                    targets: unit.sprite,
-                                    y: unit.sprite.getData('originalY') - 5, // Float up slightly
-                                    duration: 500,
-                                    ease: 'Sine.easeInOut',
-                                    yoyo: true,
-                                    repeat: -1
-                                });
-                            }
-                            
-                            const actionUI = this.scene.get('ActionUI');
-                            if (!actionUI) return;
-                    
-                            const stats = unit.stats;
-                            const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
-                            actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
-                        });
-                    
-                        unit.sprite.on('pointerout', () => {
-                            // Only reset hover effect if it's a player unit AND not the currently active one
-                            if (unit.isPlayer && this.activePlayerUnit !== unit) {
-                                // Kill all tweens on the sprite (i.e., the hover tween).
-                                this.tweens.killTweensOf(unit.sprite);
-                                // Reset the Y position to its original.
-                                unit.sprite.setY(unit.sprite.getData('originalY'));
-                            }
-                    
-                            const actionUI = this.scene.get('ActionUI');
-                            if (!actionUI) return;
-                            actionUI.hideGameTooltip();
-                        });
-                    }}
+        // This listener handles ALL clicks on this specific unit's sprite
+        unit.sprite.on('pointerdown', (pointer) => {
+            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) {
+                return;
+            }
+    
+            // Stop the event from propagating to the main input handler (for tile clicks)
+            pointer.event.stopPropagation();
+            
+            // --- Targeting Logic ---
+            // Check if we are in a targeting state
+            if (this.playerActionState === 'enhance_armor') {
+                if (unit.isPlayer && unit.sprite.tint === 0x00ff00) {
+                    this.performEnhanceArmor(unit);
+                }
+                // If the target is invalid, do nothing, forcing a cancel.
+                return;
+            }
+            if (this.playerActionState === 'attack' || this.playerActionState === 'long_attack') {
+                if (!unit.isPlayer && unit.sprite.tint === 0xff0000) {
+                    this.performPlayerAttack(unit);
+                }
+                return;
+            }
+            
+            // --- Selection Logic ---
+            // If no targeting action is active, this click is for selection.
+            if (this.playerActionState === 'SELECTING_ACTION' && unit.isPlayer) {
+                this.activatePlayerUnit(unit);
+            }
+        });
+
+        // Hover effects for all units
+        unit.sprite.on('pointerover', () => {
+            // Only apply hover effect if it's a player unit AND not the currently active one
+            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                // Kill any existing tweens to prevent conflicts before starting the new one.
+                this.tweens.killTweensOf(unit.sprite);
+    
+                // Start the bobbing hover tween
+                this.tweens.add({
+                    targets: unit.sprite,
+                    y: unit.sprite.getData('originalY') - 5, // Float up slightly
+                    duration: 500,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+            }
+            
+            const actionUI = this.scene.get('ActionUI');
+            if (!actionUI) return;
+    
+            const stats = unit.stats;
+            const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
+            actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
+        });
+    
+        unit.sprite.on('pointerout', () => {
+            // Only reset hover effect if it's a player unit AND not the currently active one
+            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                // Kill all tweens on the sprite (i.e., the hover tween).
+                this.tweens.killTweensOf(unit.sprite);
+                // Reset the Y position to its original.
+                unit.sprite.setY(unit.sprite.getData('originalY'));
+            }
+    
+            const actionUI = this.scene.get('ActionUI');
+            if (!actionUI) return;
+            actionUI.hideGameTooltip();
+        });
+    }}

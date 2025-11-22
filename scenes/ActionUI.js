@@ -27,6 +27,7 @@ export class ActionUI extends Phaser.Scene {
         this.gameScene.events.on('player_turn_ended', this.hideAll, this);
         this.gameScene.events.on('action_cancelled', () => this.showActions(this.gameScene.activePlayerUnit), this);
         this.gameScene.events.on('player_action_completed', () => this.showActions(this.gameScene.activePlayerUnit), this);
+        this.gameScene.events.on('unit_is_moving', () => this.cancelActionButton.setVisible(false), this);
 
         this.input.on('dragstart', (pointer, gameObject) => {
             if (!gameObject.getData('isDraggable')) return;

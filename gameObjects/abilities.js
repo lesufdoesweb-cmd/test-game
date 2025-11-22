@@ -31,6 +31,7 @@ export const ABILITIES = {
     'ENHANCE_ARMOR': {
         name: 'Armor Up',
         type: 'enhance_armor',
+        range: 2,
         duration: 3,
         cost: 1,
         cooldown: 4,
