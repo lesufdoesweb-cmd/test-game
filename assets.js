@@ -73,6 +73,18 @@ export default {
         ork: {
             key: 'ork',
             args: ['src/assets/units/ork.png']
+        },
+        spider: {
+            key: 'spider',
+            args: ['src/assets/units/spider.png']
+        },
+        knight: {
+            key: 'knight',
+            args: ['src/assets/units/knight.png']
+        },
+        armor_up_icon: {
+            key: 'armor_up_icon',
+            args: ['src/assets/ability_icons/armor_up.png']
         }
     },
     'spritesheet': {

@@ -5,7 +5,8 @@ import {LevelGenerator} from "../LevelGenerator.js";
 import {Obstacle} from '../gameObjects/Obstacle.js';
 import {Chest} from '../gameObjects/Chest.js';
 import {NPC} from '../gameObjects/NPC.js';
-import {ENEMY_TYPES} from "../gameObjects/enemies.js";
+import {UNIT_TYPES} from "../gameObjects/unitTypes.js";
+import {ABILITIES} from "../gameObjects/abilities.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -89,55 +90,39 @@ export class Game extends Phaser.Scene {
             const screenY = this.origin.y + (obj.position.x + obj.position.y) * this.mapConsts.QUARTER_HEIGHT;
 
             switch (obj.type) {
-                case 'player_start':
-                    const archer1 = new Unit(this, {
-                        gridX: obj.position.x,
-                        gridY: obj.position.y,
-                        texture: ASSETS.image.archer.key,
-                        name: 'Archer',
-                        stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
-                        isPlayer: true,
-                        moves: [
-                            { name: 'Move', type: 'move', range: 5, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key },
-                            { name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key }
-                        ]
-                    });
-                    this.units.push(archer1);
-                    this.playerUnits.push(archer1);
-                    this.makeUnitInteractive(archer1);
+                case 'unit':
+                    const unitType = UNIT_TYPES[obj.unitType];
+                    if (unitType) {
+                        // Deep copy stats and moves to prevent shared references
+                        const stats = { ...unitType.stats };
+                        const moves = unitType.moves.map(abilityKey => {
+                            const abilityTemplate = ABILITIES[abilityKey];
+                            const move = { ...abilityTemplate };
+                            // Special handling for MOVE ability to set range from unit stats
+                            if (move.type === 'move') {
+                                move.range = stats.moveRange;
+                            }
+                            return move;
+                        });
 
-                    const archer2 = new Unit(this, {
-                        gridX: obj.position.x + 1,
-                        gridY: obj.position.y,
-                        texture: ASSETS.image.archer.key,
-                        name: 'Archer',
-                        stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
-                        isPlayer: true,
-                        moves: [
-                            { name: 'Move', type: 'move', range: 5, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key },
-                            { name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key }
-                        ]
-                    });
-                    this.units.push(archer2);
-                    this.playerUnits.push(archer2);
-                    this.makeUnitInteractive(archer2);
-                    break;
-                case 'enemy':
-                    const enemyType = ENEMY_TYPES[obj.enemyType];
-                    if (enemyType) {
-                        const enemy = new Unit(this, {
+                        const unit = new Unit(this, {
                             gridX: obj.position.x,
                             gridY: obj.position.y,
-                            texture: ASSETS.image[enemyType.textureKey].key,
-                            frame: enemyType.frame || null,
-                            name: enemyType.name,
-                            stats: enemyType.stats,
-                            moves: enemyType.moves
+                            texture: ASSETS.image[unitType.textureKey].key,
+                            frame: unitType.frame || null,
+                            name: unitType.name,
+                            stats: stats,
+                            moves: moves,
+                            isPlayer: unitType.isPlayer
                         });
-                        this.units.push(enemy);
-                        this.makeUnitInteractive(enemy);
+                        this.units.push(unit);
+                        if (unit.isPlayer) {
+                            this.playerUnits.push(unit);
+                        }
+                        this.makeUnitInteractive(unit);
                     }
                     break;
+
                 case 'obstacle':
                     new Obstacle(this, {
                         x: screenX,
@@ -606,6 +591,14 @@ export class Game extends Phaser.Scene {
         }
 
         const currentUnit = this.turnOrder[this.turnIndex];
+
+        // Decrement status effect durations for the current unit
+        currentUnit.statusEffects.forEach(effect => {
+            effect.duration--;
+        });
+        // Remove expired effects
+        currentUnit.statusEffects = currentUnit.statusEffects.filter(effect => effect.duration > 0);
+
         this.events.emit('turn_changed', this.turnIndex);
 
         if (currentUnit.isPlayer) {
@@ -717,6 +710,18 @@ export class Game extends Phaser.Scene {
             this.highlightAttackableEnemies(move.range);
         } else if (move.type === 'move') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x0000ff);
+        } else if (move.type === 'enhance_armor') {
+            // This is a self-cast ability, no highlighting needed.
+            // Apply the effect immediately.
+            this.activePlayerUnit.addStatusEffect({ type: 'armor_up', duration: move.duration });
+
+            // Deduct AP, set cooldown, etc.
+            this.activePlayerUnit.stats.currentAp -= move.cost;
+            this.events.emit('unit_stats_changed', this.activePlayerUnit);
+            move.currentCooldown = move.cooldown;
+            
+            this.playerActionState = 'SELECTING_ACTION';
+            this.events.emit('player_action_completed');
         }
     }
 

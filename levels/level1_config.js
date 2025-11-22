@@ -12,7 +12,11 @@ export const level1Config = {
         14: { type: 'walkable', assetKey: 'dirt_2' }
     },
     objects: [
-        { type: 'player_start', position: { x: 4, y: 10 } },
-        { type: 'enemy', enemyType: 'Orc', position: { x: 5, y: 5 } },
+        { type: 'unit', unitType: 'Archer', position: { x: 4, y: 10 } },
+        { type: 'unit', unitType: 'Archer', position: { x: 5, y: 10 } },
+        { type: 'unit', unitType: 'Knight', position: { x: 3, y: 10 } },
+        { type: 'unit', unitType: 'Orc', position: { x: 5, y: 5 } },
+        { type: 'unit', unitType: 'Spider', position: { x: 4, y: 5 } },
+        { type: 'unit', unitType: 'Spider', position: { x: 6, y: 5 } },
     ]
 };

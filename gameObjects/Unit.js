@@ -18,6 +18,7 @@ export class Unit {
         };
 
         this.moves = moves;
+        this.statusEffects = [];
 
 
         this.gridPos = { x: gridX, y: gridY };
@@ -64,8 +65,18 @@ export class Unit {
 
         // Foreground (health part)
         const healthPercentage = this.stats.currentHealth / this.stats.maxHealth;
-        this.healthBar.fillStyle(0xff0000);
+        
+        let healthBarColor = 0xff0000; // Default to red for enemies
+        if (this.isPlayer) {
+            healthBarColor = 0x00ff00; // Green for players
+        }
+        this.healthBar.fillStyle(healthBarColor);
         this.healthBar.fillRect(x, y, width * healthPercentage, height);
+    }
+
+    addStatusEffect(effect) {
+        // In the future, we might want to prevent stacking, but for now, just add it.
+        this.statusEffects.push(effect);
     }
 
     update() {
@@ -140,7 +151,15 @@ export class Unit {
     }
 
     takeDamage(amount, attacker = null) {
-        this.stats.currentHealth -= amount;
+        let finalDamage = amount;
+        
+        // Check for damage reduction effects
+        const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
+        if (armorUpEffect) {
+            finalDamage *= 0.7; // 30% damage reduction
+        }
+
+        this.stats.currentHealth -= finalDamage;
         if (this.stats.currentHealth < 0) {
             this.stats.currentHealth = 0;
         }
