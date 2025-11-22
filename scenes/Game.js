@@ -5,6 +5,7 @@ import {LevelGenerator} from "../LevelGenerator.js";
 import {Obstacle} from '../gameObjects/Obstacle.js';
 import {Chest} from '../gameObjects/Chest.js';
 import {NPC} from '../gameObjects/NPC.js';
+import {ENEMY_TYPES} from "../gameObjects/enemies.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -95,7 +96,11 @@ export class Game extends Phaser.Scene {
                         texture: ASSETS.image.archer.key,
                         name: 'Archer',
                         stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
-                        isPlayer: true
+                        isPlayer: true,
+                        moves: [
+                            { name: 'Move', type: 'move', range: 5, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key },
+                            { name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key }
+                        ]
                     });
                     this.units.push(archer1);
                     this.playerUnits.push(archer1);
@@ -107,24 +112,30 @@ export class Game extends Phaser.Scene {
                         texture: ASSETS.image.archer.key,
                         name: 'Archer',
                         stats: {maxHealth: 80, currentHealth: 80, moveRange: 5, physicalDamage: 30, speed: 12},
-                        isPlayer: true
+                        isPlayer: true,
+                        moves: [
+                            { name: 'Move', type: 'move', range: 5, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key },
+                            { name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key }
+                        ]
                     });
                     this.units.push(archer2);
                     this.playerUnits.push(archer2);
                     this.makeUnitInteractive(archer2);
                     break;
                 case 'enemy':
-                    if (obj.enemyType === 'Orc') {
-                        const orc = new Unit(this, {
+                    const enemyType = ENEMY_TYPES[obj.enemyType];
+                    if (enemyType) {
+                        const enemy = new Unit(this, {
                             gridX: obj.position.x,
                             gridY: obj.position.y,
-                            texture: ASSETS.spritesheet.basic_unit.key,
-                            frame: 26,
-                            name: 'Orc',
-                            stats: {maxHealth: 80, currentHealth: 80, moveRange: 3, physicalDamage: 35, speed: 12}
+                            texture: ASSETS.image[enemyType.textureKey].key,
+                            frame: enemyType.frame || null,
+                            name: enemyType.name,
+                            stats: enemyType.stats,
+                            moves: enemyType.moves
                         });
-                        this.units.push(orc);
-                        this.makeUnitInteractive(orc);
+                        this.units.push(enemy);
+                        this.makeUnitInteractive(enemy);
                     }
                     break;
                 case 'obstacle':
@@ -315,6 +326,17 @@ export class Game extends Phaser.Scene {
                 this.isMiddleButtonDown = false;
             }
         });
+
+        // Add a persistent tween for the hover indicator animation
+        this.hoverAnimY = 0;
+        this.tweens.add({
+            targets: this,
+            yoyo: true,
+            hoverAnimY: -2, // Move up by 3 pixels (less pronounced)
+            duration: 500, // Animation duration
+            ease: 'Sine.easeInOut', // Smooth easing
+            repeat: -1 // Loop indefinitely (animates up, then snaps back and repeats)
+        });
     }
 
     performPlayerAttack(targetUnit) {
@@ -324,10 +346,12 @@ export class Game extends Phaser.Scene {
         move.currentCooldown = move.cooldown;
         this.activePlayerUnit.usedStandardAction = true;
 
-        this.activePlayerUnit.attack(targetUnit, this.playerActionState);
-        this.clearHighlights();
-        this.playerActionState = 'SELECTING_ACTION';
-        this.events.emit('player_action_completed');
+        this.activePlayerUnit.attack(targetUnit, () => {
+            targetUnit.takeDamage(this.activePlayerUnit.stats.physicalDamage, this.activePlayerUnit);
+            this.clearHighlights();
+            this.playerActionState = 'SELECTING_ACTION';
+            this.events.emit('player_action_completed');
+        });
     }
 
     update(time, delta) {
@@ -355,8 +379,11 @@ export class Game extends Phaser.Scene {
                 const color = (actionState === 'move') ? 0xffffff : 0xff0000;
                 const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
                 const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
-                
-                this.hoverIndicator = this.createCornerIsometricIndicator(screenX, screenY, color, 1); // Alpha 1 for solid corners
+
+                // Use the animated value to offset the Y position
+                const animatedY = screenY + this.hoverAnimY;
+
+                this.hoverIndicator = this.createCornerIsometricIndicator(screenX, animatedY, color, 1);
                 this.hoverIndicator.setDepth(9999); // Set a high depth to ensure it's on top
             }
         }
@@ -544,7 +571,7 @@ export class Game extends Phaser.Scene {
                     if (this.activePlayerUnit === unit) {
                         this.activeUnitTween = this.tweens.add({
                             targets: this.activePlayerUnit.sprite,
-                            y: newOriginalY - 5,
+                            y: newOriginalY - 3,
                             duration: 500,
                             ease: 'Sine.easeInOut',
                             yoyo: true,
@@ -573,8 +600,7 @@ export class Game extends Phaser.Scene {
     startNextTurn() {
         if (this.turnOrder.length === 0) return;
 
-        if (this.turnIndex >= this.turnOrder.length) {
-            this.turnIndex = 0;
+        if (this.turnIndex === 0) {
             // New round is starting, update all cooldowns
             this.units.forEach(unit => this.updateCooldowns(unit));
         }
@@ -619,7 +645,7 @@ export class Game extends Phaser.Scene {
         // Start the bobbing selection tween for the new active unit.
         this.activeUnitTween = this.tweens.add({
             targets: this.activePlayerUnit.sprite,
-            y: this.activePlayerUnit.sprite.getData('originalY') - 5,
+            y: this.activePlayerUnit.sprite.getData('originalY') - 3,
             duration: 500,
             ease: 'Sine.easeInOut',
             yoyo: true,
@@ -631,13 +657,15 @@ export class Game extends Phaser.Scene {
         this.gameState = 'PLAYER_TURN';
         this.playerActionState = 'SELECTING_ACTION';
 
-        // Set stats for the new turn
-        unit.stats.currentAp = unit.stats.maxAp;
-        unit.hasMoved = false;
-        unit.usedStandardAction = false;
-        this.events.emit('unit_stats_changed', unit);
+        // This is the start of the player phase. Reset all player units.
+        this.playerUnits.forEach(pUnit => {
+            pUnit.stats.currentAp = pUnit.stats.maxAp;
+            pUnit.hasMoved = false;
+            pUnit.usedStandardAction = false;
+            this.events.emit('unit_stats_changed', pUnit);
+        });
 
-        // Activate the unit, which handles selection and animation
+        // Activate the specific unit whose turn it is according to the turn order.
         this.activatePlayerUnit(unit);
 
         this.events.emit('player_turn_started', this.activePlayerUnit);
@@ -653,7 +681,6 @@ export class Game extends Phaser.Scene {
             }
         }
         this.activePlayerUnit = null;
-        this.playerUnits.forEach(unit => this.updateCooldowns(unit));
         this.events.emit('player_turn_ended');
 
         // Find the next enemy in the turn order, starting from the current position
@@ -818,10 +845,12 @@ export class Game extends Phaser.Scene {
                 enemy.sprite.flipX = false;
             }
 
-            enemy.attack(closestPlayerUnit, 'attack');
-            if (callback) {
-                this.time.delayedCall(300, callback, []);
-            }
+            enemy.attack(closestPlayerUnit, () => {
+                closestPlayerUnit.takeDamage(enemy.stats.physicalDamage, enemy);
+                if (callback) {
+                    this.time.delayedCall(300, callback, []);
+                }
+            });
         };
 
         const distanceToTarget = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);

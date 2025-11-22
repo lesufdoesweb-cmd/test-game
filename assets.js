@@ -69,6 +69,10 @@ export default {
         basic_attack_icon: {
             key: 'basic_attack_icon',
             args: ['src/assets/ability_icons/basic_attack.png']
+        },
+        ork: {
+            key: 'ork',
+            args: ['src/assets/units/ork.png']
         }
     },
     'spritesheet': {
@@ -93,13 +97,6 @@ export default {
                 frameHeight: 12,
                 margin: 0,
                 spacing: 4
-            }]
-        },
-        basic_unit: {
-            key: 'basic_unit',
-            args: ['src/assets/sprites/units/basic_units.png', {
-                frameWidth: 32,
-                frameHeight: 32,
             }]
         },
         ships: {

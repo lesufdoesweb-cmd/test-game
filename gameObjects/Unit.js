@@ -1,7 +1,7 @@
 import ASSETS from '../assets.js';
 
 export class Unit {
-    constructor(scene, { gridX, gridY, texture, frame, name, stats, isPlayer = false }) {
+    constructor(scene, { gridX, gridY, texture, frame, name, stats, isPlayer = false, moves = [] }) {
         this.scene = scene;
         this.name = name;
         this.isPlayer = isPlayer;
@@ -17,14 +17,7 @@ export class Unit {
             ...stats
         };
 
-        this.moves = [];
-        if (this.name === 'Archer') {
-            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key });
-            this.moves.push({ name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key });
-        } else { // Default moves for other units (e.g., Orc)
-            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key });
-            this.moves.push({ name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.basic_attack_icon.key });
-        }
+        this.moves = moves;
 
 
         this.gridPos = { x: gridX, y: gridY };
@@ -81,8 +74,69 @@ export class Unit {
         this.updateHealthBar();
     }
 
-    attack(target, moveType) {
-        target.takeDamage(this.stats.physicalDamage, this);
+    attack(target, onComplete) {
+        const scene = this.scene;
+        const originalX = this.sprite.x;
+        const originalY = this.sprite.y;
+        const originalAngle = this.sprite.angle;
+
+        const targetX = target.sprite.x;
+        const targetY = target.sprite.y;
+
+        // 1. Calculate direction vector
+        const dx = targetX - originalX;
+        const dy = targetY - originalY;
+        const angle = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance === 0) { // Prevent division by zero
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const moveBackDist = 12; // Increased
+        const moveForwardDist = 18; // Increased
+
+        // Tween 3: Return to original position
+        const returnTween = {
+            targets: this.sprite,
+            x: originalX,
+            y: originalY,
+            angle: originalAngle,
+            duration: 250,
+            delay: 50, // Hold at impact
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                if (onComplete) {
+                    onComplete();
+                }
+            }
+        };
+
+        // Tween 2: Lunge forward with rotation
+        const lungeTween = {
+            targets: this.sprite,
+            x: originalX + (dx / distance) * moveForwardDist,
+            y: originalY + (dy / distance) * moveForwardDist,
+            angle: -angle / 5, // More pronounced rotation, reversed direction
+            duration: 180,
+            ease: 'Quad.easeIn',
+            onComplete: () => {
+                scene.tweens.add(returnTween);
+            }
+        };
+        
+        // Tween 1: Move back (this one starts the chain)
+        scene.tweens.add({
+            targets: this.sprite,
+            x: originalX - (dx / distance) * moveBackDist,
+            y: originalY - (dy / distance) * moveBackDist,
+            duration: 120,
+            ease: 'Sine.easeOut',
+            onComplete: () => {
+                scene.tweens.add(lungeTween);
+            }
+        });
     }
 
     takeDamage(amount, attacker = null) {
