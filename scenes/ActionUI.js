@@ -207,11 +207,6 @@ export class ActionUI extends Phaser.Scene {
         const slot = this.slots[slotIndex];
         if (!slot) return;
 
-        const bgScale = 0.8;
-        const bg = this.add.image(slot.x, slot.y, ASSETS.image.ability_bg.key)
-            .setScale(bgScale)
-            .setDepth(10000);
-
         const move = ability.moveData;
         let isEnabled = true;
         if (move.currentCooldown > 0) isEnabled = false;
@@ -219,13 +214,8 @@ export class ActionUI extends Phaser.Scene {
         if ((move.type === 'attack' || move.type === 'long_attack') && unit.usedStandardAction) isEnabled = false;
         if (unit.stats.currentAp < move.cost) isEnabled = false;
 
-        let frame = -1;
-        if (move.type === 'attack') frame = 0;
-        if (move.type === 'long_attack') frame = 2;
-        if (move.type === 'move') frame = 7;
-
-        const scale = 8;
-        const icon = this.add.sprite(slot.x - 12, slot.y - 12, ASSETS.spritesheet.ability_atlas.key, frame)
+        const scale = 2; // Icons are 32x32, this makes them 64x64
+        const icon = this.add.image(slot.x, slot.y, move.icon)
             .setDepth(10001)
             .setData('abilityKey', ability.key)
             .setScale(scale);
@@ -242,12 +232,11 @@ export class ActionUI extends Phaser.Scene {
 
             icon.on('pointerover', () => {
                 this.tweens.add({
-                    targets: [icon, bg],
+                    targets: icon,
                     y: '-=5', // Move up 5 pixels
                     duration: 100,
                     ease: 'Power1'
                 });
-                bg.setTint(0xffd700);
                 const move = ability.moveData;
                 const abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}\nCooldown: ${move.cooldown}`;
                 this.showTooltip(abilityText, icon.x, icon.y);
@@ -255,12 +244,11 @@ export class ActionUI extends Phaser.Scene {
     
             icon.on('pointerout', () => {
                 this.tweens.add({
-                    targets: [icon, bg],
+                    targets: icon,
                     y: '+=5', // Move back down 5 pixels
                     duration: 100,
                     ease: 'Power1'
                 });
-                bg.clearTint();
                 this.hideTooltip();
             });
 
@@ -281,7 +269,6 @@ export class ActionUI extends Phaser.Scene {
         }
 
         ability.gameObject = icon;
-        ability.background = bg;
     }
 
     resetAbilityPosition(abilityKey) {
@@ -301,10 +288,6 @@ export class ActionUI extends Phaser.Scene {
             if (ability && ability.gameObject) {
                 ability.gameObject.destroy();
                 ability.gameObject = null;
-            }
-            if (ability && ability.background) {
-                ability.background.destroy();
-                ability.background = null;
             }
         });
         this.cooldownTexts.forEach(text => text.destroy());

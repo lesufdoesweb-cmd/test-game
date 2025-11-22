@@ -19,11 +19,11 @@ export class Unit {
 
         this.moves = [];
         if (this.name === 'Archer') {
-            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 });
-            this.moves.push({ name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0 });
+            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key });
+            this.moves.push({ name: 'Attack', type: 'long_attack', range: 4, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.arrow_attack_icon.key });
         } else { // Default moves for other units (e.g., Orc)
-            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0 });
-            this.moves.push({ name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0 });
+            this.moves.push({ name: 'Move', type: 'move', range: this.stats.moveRange, cost: 0, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.move_icon.key });
+            this.moves.push({ name: 'Attack', type: 'attack', range: 1, cost: 1, cooldown: 1, currentCooldown: 0, icon: ASSETS.image.basic_attack_icon.key });
         }
 
 
@@ -32,10 +32,11 @@ export class Unit {
         this.hasMoved = false;
         this.usedStandardAction = false;
 
-        const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH + 3;
-        const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT - 24;
+        const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
+        const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
 
         this.sprite = scene.add.sprite(screenX, originalY, texture, frame);
+        this.sprite.setOrigin(0.5, 1); // Set origin to bottom-center
         this.sprite.setData('originalY', originalY);
         this.sprite.setDepth(originalY);
         this.sprite.setScale(1);
@@ -57,7 +58,7 @@ export class Unit {
         const width = 24;
         const height = 4;
         const x = this.sprite.x - (width / 2);
-        const y = this.sprite.y - 22; // Closer to the sprite
+        const y = this.sprite.y - 48;
         const borderThickness = 1;
 
         // Border

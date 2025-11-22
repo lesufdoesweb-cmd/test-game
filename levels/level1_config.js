@@ -13,9 +13,6 @@ export const level1Config = {
     },
     objects: [
         { type: 'player_start', position: { x: 4, y: 10 } },
-        { type: 'enemy', enemyType: 'Orc', position: { x: 9, y: 8 } },
-        { type: 'obstacle', assetKey: 'tree', position: { x: 5, y: 8 } },
-        { type: 'chest', items: ['gold', 'potion'], position: { x: 25, y: 6 } },
-        { type: 'npc', npcType: 'old_man', position: { x: 3, y: 12 } }
+        { type: 'enemy', enemyType: 'Orc', position: { x: 5, y: 5 } },
     ]
 };

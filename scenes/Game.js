@@ -68,12 +68,13 @@ export class Game extends Phaser.Scene {
                 const tileType = this.grid[gridY][gridX];
                 if (tileType === -1) continue; // Skip void tiles
 
-                const screenX = this.origin.x + 3 + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
-                const screenY = this.origin.y + 3  + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
+                const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y  + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
 
                 const tileInfo = levelData.tileset[tileType];
                 if (tileInfo && tileInfo.assetKey) {
                     const tile = this.add.image(screenX, screenY, tileInfo.assetKey);
+                    tile.setOrigin(0.5, 0.375);
                     tile.setDepth(gridX + gridY);
                 }
 
@@ -352,11 +353,11 @@ export class Game extends Phaser.Scene {
 
             if (isTileValid) {
                 const color = (actionState === 'move') ? 0xffffff : 0xff0000;
-                const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH;
-                const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
+                const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
+                const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
                 
-                this.hoverIndicator = this.createIsometricIndicator(screenX, screenY, color, 0.6);
-                this.hoverIndicator.setDepth(gridPos.x + gridPos.y + 0.6); // Slightly above range highlight
+                this.hoverIndicator = this.createCornerIsometricIndicator(screenX, screenY, color, 1); // Alpha 1 for solid corners
+                this.hoverIndicator.setDepth(9999); // Set a high depth to ensure it's on top
             }
         }
     }
@@ -374,7 +375,6 @@ export class Game extends Phaser.Scene {
     createIsometricIndicator(screenX, screenY, color = 0x0000ff, alpha = 0.5) {
         const graphics = this.add.graphics();
         graphics.fillStyle(color, alpha);
-        screenY = screenY - 6;
         const size = this.mapConsts.TILE_WIDTH * 1;
         graphics.beginPath();
         graphics.moveTo(screenX, screenY - size / 4);
@@ -383,6 +383,70 @@ export class Game extends Phaser.Scene {
         graphics.lineTo(screenX - size / 2, screenY);
         graphics.closePath();
         graphics.fillPath();
+        return graphics;
+    }
+
+    createCornerIsometricIndicator(screenX, screenY, color = 0xffffff, alpha = 1) {
+        const graphics = this.add.graphics();
+        graphics.lineStyle(1, color, alpha);
+
+        const size = this.mapConsts.TILE_WIDTH * 1;
+        const halfWidth = size / 2;
+        const quarterHeight = size / 4;
+        const cornerLengthFraction = 0.2;
+
+        const segHalfW = halfWidth * cornerLengthFraction;
+        const segQuarterH = quarterHeight * cornerLengthFraction;
+
+        const V1 = new Phaser.Math.Vector2(screenX, screenY - quarterHeight);
+        const V2 = new Phaser.Math.Vector2(screenX + halfWidth, screenY);
+        const V3 = new Phaser.Math.Vector2(screenX, screenY + quarterHeight);
+        const V4 = new Phaser.Math.Vector2(screenX - halfWidth, screenY);
+
+        // Top corner (V1)
+        graphics.beginPath();
+        graphics.moveTo(V1.x, V1.y);
+        graphics.lineTo(V1.x + segHalfW, V1.y + segQuarterH);
+        graphics.strokePath();
+
+        graphics.beginPath();
+        graphics.moveTo(V1.x, V1.y);
+        graphics.lineTo(V1.x - segHalfW, V1.y + segQuarterH);
+        graphics.strokePath();
+
+        // Right corner (V2)
+        graphics.beginPath();
+        graphics.moveTo(V2.x, V2.y);
+        graphics.lineTo(V2.x - segHalfW, V2.y - segQuarterH);
+        graphics.strokePath();
+        
+        graphics.beginPath();
+        graphics.moveTo(V2.x, V2.y);
+        graphics.lineTo(V2.x - segHalfW, V2.y + segQuarterH);
+        graphics.strokePath();
+
+        // Bottom corner (V3)
+        graphics.beginPath();
+        graphics.moveTo(V3.x, V3.y);
+        graphics.lineTo(V3.x - segHalfW, V3.y - segQuarterH);
+        graphics.strokePath();
+        
+        graphics.beginPath();
+        graphics.moveTo(V3.x, V3.y);
+        graphics.lineTo(V3.x + segHalfW, V3.y - segQuarterH);
+        graphics.strokePath();
+
+        // Left corner (V4)
+        graphics.beginPath();
+        graphics.moveTo(V4.x, V4.y);
+        graphics.lineTo(V4.x + segHalfW, V4.y - segQuarterH);
+        graphics.strokePath();
+
+        graphics.beginPath();
+        graphics.moveTo(V4.x, V4.y);
+        graphics.lineTo(V4.x + segHalfW, V4.y + segQuarterH);
+        graphics.strokePath();
+
         return graphics;
     }
 
@@ -428,8 +492,8 @@ export class Game extends Phaser.Scene {
         }
 
         const screenPath = path.map(pos => ({
-            x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH + 3,
-            y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT - 24,
+            x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
+            y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT,
         }));
 
         const movementPath = new Phaser.Curves.Path(screenPath[0].x, screenPath[0].y);
@@ -461,7 +525,7 @@ export class Game extends Phaser.Scene {
                 }
 
                 // Update the 'originalY' for the new position
-                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT - 26;
+                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
                 unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
                 unit.sprite.setData('originalY', newOriginalY);
 
@@ -675,8 +739,8 @@ export class Game extends Phaser.Scene {
                     openList.push({pos: neighbor, cost: current.cost + 1});
                     this.validActionTiles.push(neighbor); // Store the valid tile
 
-                    const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH;
-                    const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT;
+                    const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH + 2;
+                    const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT - 6;
                     const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.2);
                     indicator.disableInteractive();
                     indicator.setDepth(neighbor.x + neighbor.y + 0.5);

@@ -32,15 +32,15 @@ export default {
         },
         base_1: {
             key: 'base_1',
-            args: ['src/assets/better_tiles/forest_tile.png']
+            args: ['src/assets/better_tiles/forest_tile_1.png']
         },
         base_2: {
             key: 'base_2',
-            args: ['src/assets/better_tiles/forest_tile.png']
+            args: ['src/assets/better_tiles/forest_tile_2.png']
         },
         base_3: {
             key: 'base_3',
-            args: ['src/assets/better_tiles/forest_tile.png']
+            args: ['src/assets/better_tiles/forest_tile_3.png']
         },
         dirt_1: {
             key: 'dirt_1',
@@ -54,13 +54,21 @@ export default {
             key: 'obstacle_tree',
             args: ['src/assets/sprites/terrain/forest.png']
         },
-        ability_bg: {
-            key: 'ability_bg',
-            args: ['src/assets/user_interface/ability_bg.png']
-        },
         timeline_bg: {
             key: 'timeline_bg',
             args: ['src/assets/user_interface/timeline_bg.png']
+        },
+        arrow_attack_icon: {
+            key: 'arrow_attack_icon',
+            args: ['src/assets/ability_icons/arrow_attack.png']
+        },
+        move_icon: {
+            key: 'move_icon',
+            args: ['src/assets/ability_icons/move.png']
+        },
+        basic_attack_icon: {
+            key: 'basic_attack_icon',
+            args: ['src/assets/ability_icons/basic_attack.png']
         }
     },
     'spritesheet': {
