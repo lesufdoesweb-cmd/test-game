@@ -30,17 +30,7 @@ export class LevelGenerator {
             }
         }
 
-        // Place objects that affect the grid
-        config.objects.forEach(obj => {
-            if (obj.type === 'obstacle') {
-                if (grid[obj.position.y] && grid[obj.position.y][obj.position.x] !== undefined) {
-                    // Check if the tile is a base walkable tile before placing a walkable_obstacle
-                    if (baseTileIds.includes(grid[obj.position.y][obj.position.x])) {
-                         grid[obj.position.y][obj.position.x] = 3; // 3 is walkable_obstacle tile type
-                    }
-                }
-            }
-        });
+
 
         return {
             layout: grid,

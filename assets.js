@@ -6,6 +6,10 @@ export default {
     //     },
     // },
     'image': {
+        tree: {
+            key: 'tree',
+            args: ['src/assets/map_objects/tree_1.png']
+        },
         archer: {
             key: 'archer',
             args: ['src/assets/units/archer.png']

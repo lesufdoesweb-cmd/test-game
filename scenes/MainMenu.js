@@ -68,14 +68,6 @@ export class MainMenu extends Phaser.Scene {
             const buttonYStart = height / 2 + 50;
     
             this.createButton(buttonYStart, 'Start Game', () => {
-                this.scene.start('LevelSelector');
-            });
-    
-            this.createButton(buttonYStart + 120, 'Level Selector', () => {
-                this.scene.start('LevelSelector');
-            });
-            
-            this.createButton(buttonYStart + 240, 'Level Editor', () => {
-                this.scene.start('LevelEditor');
+                this.scene.start('Game');
             });
         }}

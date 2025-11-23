@@ -1,13 +1,15 @@
 import ASSETS from '../assets.js';
 import {Unit} from '../gameObjects/Unit.js';
-import {level1Config} from '../levels/level1_config.js';
 import {LevelGenerator} from "../LevelGenerator.js";
-import {Obstacle} from '../gameObjects/Obstacle.js';
 import {Chest} from '../gameObjects/Chest.js';
 import {NPC} from '../gameObjects/NPC.js';
 import {UNIT_TYPES} from "../gameObjects/unitTypes.js";
 import {ABILITIES} from "../gameObjects/abilities.js";
 import {Projectile} from "../gameObjects/Projectile.js";
+import {testMap} from "../battle_maps/test_map.js";
+import {testArmy} from "../enemy_armies/test_army.js";
+import {defaultArmy} from "../player_armies/default_army.js";
+import {Scenery} from "../gameObjects/Scenery.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
@@ -16,6 +18,7 @@ export class Game extends Phaser.Scene {
         this.activePlayerUnit = null;
         this.playerUnits = [];
         this.units = []; // This will hold all Unit objects
+        this.sceneryObjects = [];
         this.grid = [];
         this.origin = {x: 0, y: 0};
         this.mapConsts = {
@@ -43,8 +46,50 @@ export class Game extends Phaser.Scene {
     }
 
     create(data) {
-        const levelConfig = data.levelConfig || level1Config;
+        const battleMap = data.battleMap || testMap;
+        const enemyArmy = data.enemyArmy || testArmy;
+        const playerArmy = data.playerArmy || defaultArmy;
+
+        // Combine map objects and units into a single list for processing
+        const combinedObjects = [...battleMap.objects];
+
+        const playerSpawnPoints = [
+            {x: 3, y: 10}, {x: 4, y: 10}, {x: 2, y: 10}, {x: 5, y: 10},
+            {x: 3, y: 11}, {x: 4, y: 11}, {x: 2, y: 11}, {x: 5, y: 11},
+        ];
+
+        playerArmy.units.forEach((unitType, index) => {
+            if (index < playerSpawnPoints.length) {
+                combinedObjects.push({
+                    type: 'unit',
+                    unitType: unitType,
+                    position: playerSpawnPoints[index]
+                });
+            }
+        });
+
+        const enemySpawnPoints = [
+            {x: 3, y: 1}, {x: 4, y: 1}, {x: 2, y: 1}, {x: 5, y: 1},
+            {x: 3, y: 2}, {x: 4, y: 2}, {x: 2, y: 2}, {x: 5, y: 2},
+        ];
+
+        enemyArmy.units.forEach((unitType, index) => {
+            if (index < enemySpawnPoints.length) {
+                combinedObjects.push({
+                    type: 'unit',
+                    unitType: unitType,
+                    position: enemySpawnPoints[index]
+                });
+            }
+        });
+
+        const levelConfig = {
+            ...battleMap,
+            objects: combinedObjects
+        };
+
         const levelData = LevelGenerator.generate(levelConfig);
+
 
         this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
         this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
@@ -71,6 +116,13 @@ export class Game extends Phaser.Scene {
             .map(k => parseInt(k));
         this.walkableTiles = walkableTiles;
         this.easystar.setAcceptableTiles(walkableTiles);
+
+        // Make scenery objects non-walkable
+        levelData.objects.forEach(obj => {
+            if (obj.type === 'scenery') {
+                this.easystar.avoidAdditionalPoint(obj.position.x, obj.position.y);
+            }
+        });
 
 
         // --- Map Rendering ---
@@ -131,14 +183,15 @@ export class Game extends Phaser.Scene {
                         this.makeUnitInteractive(unit);
                     }
                     break;
-
-                case 'obstacle':
-                    new Obstacle(this, {
+                case 'scenery':
+                    const scenery = new Scenery(this, {
                         x: screenX,
                         y: screenY,
-                        texture: ASSETS.image.obstacle_tree.key,
-                        depth: screenY
+                        texture: obj.assetKey,
+                        depth: screenY,
+                        gridPos: obj.position
                     });
+                    this.sceneryObjects.push(scenery);
                     break;
                 case 'chest':
                     new Chest(this, {
@@ -392,6 +445,22 @@ export class Game extends Phaser.Scene {
             this.vignette.x = this.activePlayerUnit.sprite.x;
             this.vignette.y = this.activePlayerUnit.sprite.y;
         }
+
+        // --- Scenery Transparency Logic ---
+        this.sceneryObjects.forEach(scenery => {
+            scenery.sprite.alpha = 1;
+        });
+
+        this.units.forEach(unit => {
+            this.sceneryObjects.forEach(scenery => {
+                // Check if the unit is on the tile directly "behind" the scenery object in grid coordinates
+                // (same x, and y is one greater for the unit, meaning it's visually below/behind the tree)
+                if (unit.gridPos.x === scenery.gridPos.x -1 && unit.gridPos.y === scenery.gridPos.y - 1) {
+                    scenery.sprite.alpha = 0.5;
+                }
+            });
+        });
+
 
         // --- Hover Indicator Logic ---
         if (this.hoverIndicator) {
