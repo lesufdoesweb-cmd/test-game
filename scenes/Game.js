@@ -1,255 +1,1102 @@
-/*
-* Asset from: https://kenney.nl/assets/pixel-platformer
-*
-*/
 import ASSETS from '../assets.js';
-import ANIMATION from '../animation.js';
-import Player from '../gameObjects/Player.js';
-import PlayerBullet from '../gameObjects/PlayerBullet.js';
-import EnemyFlying from '../gameObjects/EnemyFlying.js';
-import EnemyBullet from '../gameObjects/EnemyBullet.js';
-import Explosion from '../gameObjects/Explosion.js';
+import {Unit} from '../gameObjects/Unit.js';
+import {level1Config} from '../levels/level1_config.js';
+import {LevelGenerator} from "../LevelGenerator.js";
+import {Obstacle} from '../gameObjects/Obstacle.js';
+import {Chest} from '../gameObjects/Chest.js';
+import {NPC} from '../gameObjects/NPC.js';
+import {UNIT_TYPES} from "../gameObjects/unitTypes.js";
+import {ABILITIES} from "../gameObjects/abilities.js";
+import {Projectile} from "../gameObjects/Projectile.js";
 
 export class Game extends Phaser.Scene {
     constructor() {
         super('Game');
+        this.easystar = null;
+        this.activePlayerUnit = null;
+        this.playerUnits = [];
+        this.units = []; // This will hold all Unit objects
+        this.grid = [];
+        this.origin = {x: 0, y: 0};
+        this.mapConsts = {
+            MAP_SIZE_X: 0,
+            MAP_SIZE_Y: 0,
+            TILE_WIDTH: 48,
+            HALF_WIDTH: 0,
+            QUARTER_HEIGHT: 0,
+        }
+        this.rangeHighlights = [];
+        this.validActionTiles = [];
+        this.hoverIndicator = null;
+
+        this.turnOrder = [];
+        this.turnIndex = 0;
+        this.playerActionState = null; // e.g., 'SELECTING_ACTION', 'MOVING', 'ATTACKING'
+        this.vignette = null;
+        this.activeUnitTween = null;
+        this.isMoving = false; // ensure defined
+        this.isMiddleButtonDown = false;
+        this.lastCameraX = 0;
+        this.lastCameraY = 0;
+        this.lastPointerX = 0;
+        this.lastPointerY = 0;
     }
 
-    create() {
-        this.initVariables();
-        this.initGameUi();
-        this.initAnimations();
-        this.initPlayer();
-        this.initInput();
-        this.initPhysics();
-        this.initMap();
-    }
+    create(data) {
+        const levelConfig = data.levelConfig || level1Config;
+        const levelData = LevelGenerator.generate(levelConfig);
 
-    update() {
-        this.updateMap();
+        this.mapConsts.HALF_WIDTH = this.mapConsts.TILE_WIDTH / 2;
+        this.mapConsts.QUARTER_HEIGHT = this.mapConsts.TILE_WIDTH / 4;
+        this.mapConsts.MAP_SIZE_X = levelData.mapSize.width;
+        this.mapConsts.MAP_SIZE_Y = levelData.mapSize.height;
 
-        if (!this.gameStarted) return;
+        // Add the combat background image
+        const { width, height } = this.scale;
+        const bgImage = this.add.image(width / 2, height / 2, 'bg_fights');
+        const scaleX = width / bgImage.width;
+        const scaleY = height / bgImage.height;
+        const scale = Math.max(scaleX, scaleY);
+        bgImage.setScale(scale).setDepth(-1);
 
-        this.player.update();
-        if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
-        else this.addFlyingGroup();
-    }
+        this.origin.x = this.scale.width / 2;
+        this.origin.y = this.scale.height / 2 - 100;
 
-    initVariables() {
-        this.score = 0;
-        this.centreX = this.scale.width * 0.5;
-        this.centreY = this.scale.height * 0.5;
+        // --- Level Setup from Config ---
+        this.easystar = new EasyStar.js();
+        this.grid = levelData.layout;
+        this.easystar.setGrid(this.grid);
+        const walkableTiles = Object.keys(levelData.tileset)
+            .filter(k => levelData.tileset[k].type === 'walkable' || levelData.tileset[k].type === 'bridge')
+            .map(k => parseInt(k));
+        this.walkableTiles = walkableTiles;
+        this.easystar.setAcceptableTiles(walkableTiles);
 
-        // list of tile ids in tiles.png
-        // items nearer to the beginning of the array have a higher chance of being randomly chosen when using weighted()
-        this.tiles = [50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 36, 48, 60, 72, 84];
-        this.tileSize = 32; // width and height of a tile in pixels
 
-        this.mapOffset = 10; // offset (in tiles) to move the map above the top of the screen
-        this.mapTop = -this.mapOffset * this.tileSize; // offset (in pixels) to move the map above the top of the screen
-        this.mapHeight = Math.ceil(this.scale.height / this.tileSize) + this.mapOffset + 1; // height of the tile map (in tiles)
-        this.mapWidth = Math.ceil(this.scale.width / this.tileSize); // width of the tile map (in tiles)
-        this.scrollSpeed = 1; // background scrolling speed (in pixels)
-        this.scrollMovement = 0; // current scroll amount
-        this.spawnEnemyCounter = 0; // timer before spawning next group of enemies
+        // --- Map Rendering ---
+        for (let gridY = 0; gridY < this.mapConsts.MAP_SIZE_Y; gridY++) {
+            for (let gridX = 0; gridX < this.mapConsts.MAP_SIZE_X; gridX++) {
+                const tileType = this.grid[gridY][gridX];
+                if (tileType === -1) continue; // Skip void tiles
 
-        this.map; // rference to tile map
-        this.groundLayer; // reference to ground layer of tile map
-    }
+                const screenX = this.origin.x + (gridX - gridY) * this.mapConsts.HALF_WIDTH;
+                const screenY = this.origin.y  + (gridX + gridY) * this.mapConsts.QUARTER_HEIGHT;
 
-    initGameUi() {
-        // Create tutorial text
-        this.tutorialText = this.add.text(this.centreX, this.centreY, 'Tap to shoot!', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        })
-            .setOrigin(0.5)
-            .setDepth(100);
+                const tileInfo = levelData.tileset[tileType];
+                if (tileInfo && tileInfo.assetKey) {
+                    const tile = this.add.image(screenX, screenY, tileInfo.assetKey);
+                    tile.setOrigin(0.5, 0.375);
+                    tile.setDepth(gridX + gridY);
+                }
 
-        // Create score text
-        this.scoreText = this.add.text(20, 20, 'Score: 0', {
-            fontFamily: 'Arial Black', fontSize: 28, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-        })
-            .setDepth(100);
 
-        // Create game over text
-        this.gameOverText = this.add.text(this.scale.width * 0.5, this.scale.height * 0.5, 'Game Over', {
-            fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        })
-            .setOrigin(0.5)
-            .setDepth(100)
-            .setVisible(false);
-    }
+            }
+        }
 
-    initAnimations() {
-        this.anims.create({
-            key: ANIMATION.explosion.key,
-            frames: this.anims.generateFrameNumbers(ANIMATION.explosion.texture, ANIMATION.explosion.config),
-            frameRate: ANIMATION.explosion.frameRate,
-            repeat: ANIMATION.explosion.repeat
+        // --- Object Creation from Config ---
+        levelData.objects.forEach(obj => {
+            const screenX = this.origin.x + (obj.position.x - obj.position.y) * this.mapConsts.HALF_WIDTH;
+            const screenY = this.origin.y + (obj.position.x + obj.position.y) * this.mapConsts.QUARTER_HEIGHT;
+
+            switch (obj.type) {
+                case 'unit':
+                    const unitType = UNIT_TYPES[obj.unitType];
+                    if (unitType) {
+                        // Deep copy stats and moves to prevent shared references
+                        const stats = { ...unitType.stats };
+                        const moves = unitType.moves.map(abilityKey => {
+                            const abilityTemplate = ABILITIES[abilityKey];
+                            const move = { ...abilityTemplate };
+                            // Special handling for MOVE ability to set range from unit stats
+                            if (move.type === 'move') {
+                                move.range = stats.moveRange;
+                            }
+                            return move;
+                        });
+
+                        const unit = new Unit(this, {
+                            gridX: obj.position.x,
+                            gridY: obj.position.y,
+                            texture: ASSETS.image[unitType.textureKey].key,
+                            frame: unitType.frame || null,
+                            name: unitType.name,
+                            stats: stats,
+                            moves: moves,
+                            isPlayer: unitType.isPlayer
+                        });
+                        this.units.push(unit);
+                        if (unit.isPlayer) {
+                            this.playerUnits.push(unit);
+                        }
+                        this.makeUnitInteractive(unit);
+                    }
+                    break;
+
+                case 'obstacle':
+                    new Obstacle(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.image.obstacle_tree.key,
+                        depth: screenY
+                    });
+                    break;
+                case 'chest':
+                    new Chest(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.spritesheet.items.key,
+                        frame: 0,
+                        depth: screenY,
+                        items: obj.items
+                    });
+                    break;
+                case 'npc':
+                    new NPC(this, {
+                        x: screenX,
+                        y: screenY,
+                        texture: ASSETS.spritesheet.npc.key,
+                        frame: 0,
+                        depth: screenY,
+                        npcType: obj.npcType
+                    });
+                    break;
+            }
         });
-    }
 
-    initPhysics() {
-        this.enemyGroup = this.add.group();
-        this.enemyBulletGroup = this.add.group();
-        this.playerBulletGroup = this.add.group();
 
-        this.physics.add.overlap(this.player, this.enemyBulletGroup, this.hitPlayer, null, this);
-        this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy, null, this);
-        this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer, null, this);
-    }
-
-    initPlayer() {
-        this.player = new Player(this, this.centreX, this.scale.height - 100, 8);
-    }
-
-    initInput() {
-        this.cursors = this.input.keyboard.createCursorKeys();
-
-        // check for spacebar press only once
-        this.cursors.space.once('down', (key, event) => {
-            this.startGame();
+        // Orc animations removed as per request for programmatic animation
+        this.units.forEach(u => {
+            if (!u.isPlayer) {
+                // Future programmatic idle animation can go here
+            }
         });
-    }
 
-    // create tile map data
-    initMap() {
-        const mapData = [];
+        // --- Camera and Input ---
+        this.cameras.main.setZoom(4.5);
+        this.cameras.main.setRoundPixels(true);
+        this.cameras.main.centerOn(this.playerUnits[0].sprite.x, this.playerUnits[0].sprite.y);
 
-        for (let y = 0; y < this.mapHeight; y++) {
-            const row = [];
+        // --- Start Game ---
+        this.buildTurnOrder();
+        this.scene.launch('TimelineUI', {turnOrder: this.turnOrder});
+        this.scene.launch('ActionUI');
+        this.scene.launch('PlayerStatsUI');
 
-            for (let x = 0; x < this.mapWidth; x++) {
-                // randomly choose a tile id from this.tiles
-                // weightedPick favours items earlier in the array
-                const tileIndex = Phaser.Math.RND.weightedPick(this.tiles);
+        // Delay the start of the first turn by a tiny amount
+        // to ensure all UI scenes have time to set up their event listeners.
+        this.time.delayedCall(1, () => {
+            this.startNextTurn();
+        });
 
-                row.push(tileIndex);
+        // --- Event Listeners ---
+        this.events.on('unit_stats_changed', (unit) => {
+            if (this.playerUnits.includes(unit)) {
+                this.events.emit('player_stats_changed', unit);
+            }
+        });
+        this.events.on('action_selected', this.onActionSelected, this);
+        this.events.on('unit_died', this.onUnitDied, this);
+        this.events.on('action_cancelled', this.cancelPlayerAction, this);
+        this.events.on('skip_turn', this.endFullPlayerTurn, this);
+
+        // --- Particle Effects ---
+        const particleG = this.add.graphics();
+        particleG.fillStyle(0xffffff);
+        particleG.fillRect(0, 0, 1, 1);
+        particleG.generateTexture('particle', 1, 1);
+        particleG.destroy();
+
+
+        this.events.on('unit_damaged', (x, y, attacker, target) => {
+
+            // compute angle config (default omni)
+            let angleCfg = {min: 0, max: 360};
+
+            // Preferred: attacker/target are Unit objects with gridPos
+            if (attacker && target && attacker.gridPos && target.gridPos) {
+                const dx = target.gridPos.x - attacker.gridPos.x;
+                const dy = target.gridPos.y - attacker.gridPos.y;
+                const splashAngle = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+                angleCfg = {min: splashAngle - 25, max: splashAngle + 25};
+            }
+            // Fallback: if attacker/target were passed as numbers (coords)
+            else if (typeof attacker === 'number' && typeof target === 'number') {
+                const dx = x - attacker;
+                const dy = y - target;
+                const angleDeg = Phaser.Math.RadToDeg(Math.atan2(dy, dx));
+                const splashAngle = angleDeg + 180;
+                angleCfg = {min: splashAngle - 25, max: splashAngle + 25};
             }
 
-            mapData.push(row);
-        }
-        this.map = this.make.tilemap({ data: mapData, tileWidth: this.tileSize, tileHeight: this.tileSize });
-        const tileset = this.map.addTilesetImage(ASSETS.spritesheet.tiles.key);
-        this.groundLayer = this.map.createLayer(0, tileset, 0, this.mapTop);
-    }
+            // Create a ONE-SHOT emitter at the hit location with the chosen angle range.
+            // Note: in Phaser >= 3.60 the call signature is this.add.particles(x, y, key, config)
+            const emitter = this.add.particles(x, y, 'particle', {
+                angle: angleCfg,
+                speed: {min: 150, max: 300},
+                scale: {start: 4, end: 0},
+                lifespan: 500,
+                gravityY: 400,
+                alpha: {start: 1, end: 0},
+                tint: 0xff0000,
+                emitting: false   // we'll trigger with explode()
+            });
 
-    // scroll the tile map
-    updateMap() {
-        this.scrollMovement += this.scrollSpeed;
+            emitter.setDepth(99999999);
+            // explode immediately (one shot)
+            if (emitter && emitter.explode) {
+                emitter.explode(30); // emit 30 particles
+            }
 
-        if (this.scrollMovement >= this.tileSize) {
-            //  Create new row on top
-            let tile;
-            let prev;
+            // schedule emitter cleanup after particles finish
+            this.time.delayedCall(700, () => {
+                try {
+                    emitter.stop();
+                } catch (e) {
+                }
+                if (emitter && emitter.destroy) emitter.destroy();
+            });
 
-            // loop through map from bottom to top row
-            for (let y = this.mapHeight - 2; y > 0; y--) {
-                // loop through map from left to right column
-                for (let x = 0; x < this.mapWidth; x++) {
-                    tile = this.map.getTileAt(x, y - 1);
-                    prev = this.map.getTileAt(x, y);
+            this.cameras.main.shake(120, 0.0005);
+        });
 
-                    prev.index = tile.index;
 
-                    if (y === 1) { // if top row
-                        // randomly choose a tile id from this.tiles
-                        // weightedPick favours items earlier in the array
-                        tile.index = Phaser.Math.RND.weightedPick(this.tiles);
+        this.input.on('pointerdown', (pointer) => {
+            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) return;
+        
+            if (pointer.middleButtonDown()) {
+                this.isMiddleButtonDown = true;
+                this.lastCameraX = this.cameras.main.scrollX;
+                this.lastCameraY = this.cameras.main.scrollY;
+                this.lastPointerX = pointer.x;
+                this.lastPointerY = pointer.y;
+                return;
+            }
+            if (pointer.rightButtonDown()) {
+                this.cancelPlayerAction();
+                return;
+            }
+        
+            if (pointer.leftButtonDown()) {
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
+        
+                if (gridPos.x < 0 || gridPos.x >= this.mapConsts.MAP_SIZE_X || gridPos.y < 0 || gridPos.y >= this.mapConsts.MAP_SIZE_Y) {
+                    return; // Click outside map bounds
+                }
+        
+                // Check if the tile is a valid action tile for the current state
+                const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
+                if (!isTileValid) {
+                    return; // Clicked on an invalid tile for the current action
+                }
+        
+                // --- Handle action based on state ---
+                if (this.playerActionState === 'move') {
+                    this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
+        
+                } else if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
+                    const targetUnit = this.getUnitAtGridPos(gridPos);
+                    if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0xff0000) { // Check tint, which confirms it's a valid highlighted target
+                        this.performPlayerAttack(targetUnit);
+                    }
+        
+                } else if (this.playerActionState === 'enhance_armor') {
+                    const targetUnit = this.getUnitAtGridPos(gridPos);
+                    if (targetUnit && targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0x00ff00) { // Check tint
+                        this.performEnhanceArmor(targetUnit);
                     }
                 }
             }
+        });
 
-            this.scrollMovement -= this.tileSize; // reset to 0
+        this.input.on('pointermove', (pointer) => {
+            if (this.isMiddleButtonDown) {
+                const dx = pointer.x - this.lastPointerX;
+                const dy = pointer.y - this.lastPointerY;
+
+                this.cameras.main.scrollX = this.lastCameraX - dx / this.cameras.main.zoom;
+                this.cameras.main.scrollY = this.lastCameraY - dy / this.cameras.main.zoom;
+            }
+        });
+
+        this.input.on('pointerup', (pointer) => {
+            if (this.isMiddleButtonDown) {
+                this.isMiddleButtonDown = false;
+            }
+        });
+
+        // Add a persistent tween for the hover indicator animation
+        this.hoverAnimY = 0;
+        this.tweens.add({
+            targets: this,
+            yoyo: true,
+            hoverAnimY: -2, // Move up by 3 pixels (less pronounced)
+            duration: 500, // Animation duration
+            ease: 'Sine.easeInOut', // Smooth easing
+            repeat: -1 // Loop indefinitely (animates up, then snaps back and repeats)
+        });
+
+        // Disable the browser's context menu on right-click
+        this.input.mouse.disableContextMenu();
+    }
+
+    performEnhanceArmor(targetUnit) {
+        const move = this.activeMove;
+        if (!move) return;
+    
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+    
+        targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration, amount: move.amount });
+        
+        this.clearHighlights();
+        this.playerActionState = 'SELECTING_ACTION';
+        this.events.emit('player_action_completed');
+    }
+    
+    performPlayerAttack(targetUnit) {
+        const move = this.activeMove;
+        if (!move) return;
+
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+        this.activePlayerUnit.usedStandardAction = true;
+
+        const onHit = () => {
+            const damageInfo = this.activePlayerUnit.calculateDamage(targetUnit);
+            targetUnit.takeDamage(damageInfo, this.activePlayerUnit, move);
+            this.clearHighlights();
+            this.playerActionState = 'SELECTING_ACTION';
+            this.events.emit('player_action_completed');
+        };
+
+        if (move.type === 'arrow_attack') {
+            const projectile = new Projectile(
+                this,
+                this.activePlayerUnit.sprite.x,
+                this.activePlayerUnit.sprite.y - 24, // Start from near the unit's head
+                ASSETS.image.arrow_projectile.key,
+                targetUnit.sprite,
+                onHit
+            );
+            projectile.setDepth(9999);
+        } else {
+            this.activePlayerUnit.attack(targetUnit, onHit);
+        }
+    }
+    update(time, delta) {
+        this.units.forEach(u => u.update());
+        if (this.vignette && this.activePlayerUnit) {
+            this.vignette.x = this.activePlayerUnit.sprite.x;
+            this.vignette.y = this.activePlayerUnit.sprite.y;
         }
 
-        this.groundLayer.y = this.mapTop + this.scrollMovement; // move one tile up
-    }
+        // --- Hover Indicator Logic ---
+        if (this.hoverIndicator) {
+            this.hoverIndicator.destroy();
+            this.hoverIndicator = null;
+        }
 
-    startGame() {
-        this.gameStarted = true;
-        this.tutorialText.setVisible(false);
-        this.addFlyingGroup();
-    }
+        const actionState = this.playerActionState;
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor') {
+            const pointer = this.input.activePointer;
+            const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
 
-    fireBullet(x, y) {
-        const bullet = new PlayerBullet(this, x, y);
-        this.playerBulletGroup.add(bullet);
-    }
+            const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
 
-    removeBullet(bullet) {
-        this.playerBulletGroup.remove(bullet, true, true);
-    }
+            if (isTileValid) {
+                let color = 0xffffff; // Default for move
+                if (actionState === 'attack' || actionState === 'arrow_attack') color = 0xff0000;
+                if (actionState === 'enhance_armor') color = 0x00ff99;
 
-    fireEnemyBullet(x, y, power) {
-        const bullet = new EnemyBullet(this, x, y, power);
-        this.enemyBulletGroup.add(bullet);
-    }
+                const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
+                const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
 
-    removeEnemyBullet(bullet) {
-        this.playerBulletGroup.remove(bullet, true, true);
-    }
+                // Use the animated value to offset the Y position
+                const animatedY = screenY + this.hoverAnimY;
 
-    // add a group of flying enemies
-    addFlyingGroup() {
-        this.spawnEnemyCounter = Phaser.Math.RND.between(5, 8) * 60; // spawn next group after x seconds
-        const randomId = Phaser.Math.RND.between(0, 11); // id to choose image in tiles.png
-        const randomCount = Phaser.Math.RND.between(5, 15); // number of enemies to spawn
-        const randomInterval = Phaser.Math.RND.between(8, 12) * 100; // delay between spawning of each enemy
-        const randomPath = Phaser.Math.RND.between(0, 3); // choose a path, a group follows the same path
-        const randomPower = Phaser.Math.RND.between(1, 4); // strength of the enemy to determine damage to inflict and selecting bullet image
-        const randomSpeed = Phaser.Math.RND.realInRange(0.0001, 0.001); // increment of pathSpeed in enemy
-
-        this.timedEvent = this.time.addEvent(
-            {
-                delay: randomInterval,
-                callback: this.addEnemy,
-                args: [randomId, randomPath, randomSpeed, randomPower], // parameters passed to addEnemy()
-                callbackScope: this,
-                repeat: randomCount
+                this.hoverIndicator = this.createCornerIsometricIndicator(screenX, animatedY, color, 1);
+                this.hoverIndicator.setDepth(9999); // Set a high depth to ensure it's on top
             }
-        );
+        }
     }
 
-    addEnemy(shipId, pathId, speed, power) {
-        const enemy = new EnemyFlying(this, shipId, pathId, speed, power);
-        this.enemyGroup.add(enemy);
+    screenToGrid(screenX, screenY) {
+        const dx = screenX - this.origin.x;
+        const dy = screenY - this.origin.y;
+
+        const gridX = Math.round((dx / this.mapConsts.HALF_WIDTH + dy / this.mapConsts.QUARTER_HEIGHT) / 2);
+        const gridY = Math.round((dy / this.mapConsts.QUARTER_HEIGHT - dx / this.mapConsts.HALF_WIDTH) / 2);
+
+        return {x: gridX, y: gridY};
     }
 
-    removeEnemy(enemy) {
-        this.enemyGroup.remove(enemy, true, true);
+    createIsometricIndicator(screenX, screenY, color = 0x0000ff, alpha = 0.5) {
+        const graphics = this.add.graphics();
+        graphics.fillStyle(color, alpha);
+        const size = this.mapConsts.TILE_WIDTH * 1;
+        graphics.beginPath();
+        graphics.moveTo(screenX, screenY - size / 4);
+        graphics.lineTo(screenX + size / 2, screenY);
+        graphics.lineTo(screenX, screenY + size / 4);
+        graphics.lineTo(screenX - size / 2, screenY);
+        graphics.closePath();
+        graphics.fillPath();
+        return graphics;
     }
 
-    addExplosion(x, y) {
-        new Explosion(this, x, y);
+    createCornerIsometricIndicator(screenX, screenY, color = 0xffffff, alpha = 1) {
+        const graphics = this.add.graphics();
+        graphics.lineStyle(1, color, alpha);
+
+        const size = this.mapConsts.TILE_WIDTH * 1;
+        const halfWidth = size / 2;
+        const quarterHeight = size / 4;
+        const cornerLengthFraction = 0.2;
+
+        const segHalfW = halfWidth * cornerLengthFraction;
+        const segQuarterH = quarterHeight * cornerLengthFraction;
+
+        const V1 = new Phaser.Math.Vector2(screenX, screenY - quarterHeight);
+        const V2 = new Phaser.Math.Vector2(screenX + halfWidth, screenY);
+        const V3 = new Phaser.Math.Vector2(screenX, screenY + quarterHeight);
+        const V4 = new Phaser.Math.Vector2(screenX - halfWidth, screenY);
+
+        // Top corner (V1)
+        graphics.beginPath();
+        graphics.moveTo(V1.x, V1.y);
+        graphics.lineTo(V1.x + segHalfW, V1.y + segQuarterH);
+        graphics.strokePath();
+
+        graphics.beginPath();
+        graphics.moveTo(V1.x, V1.y);
+        graphics.lineTo(V1.x - segHalfW, V1.y + segQuarterH);
+        graphics.strokePath();
+
+        // Right corner (V2)
+        graphics.beginPath();
+        graphics.moveTo(V2.x, V2.y);
+        graphics.lineTo(V2.x - segHalfW, V2.y - segQuarterH);
+        graphics.strokePath();
+        
+        graphics.beginPath();
+        graphics.moveTo(V2.x, V2.y);
+        graphics.lineTo(V2.x - segHalfW, V2.y + segQuarterH);
+        graphics.strokePath();
+
+        // Bottom corner (V3)
+        graphics.beginPath();
+        graphics.moveTo(V3.x, V3.y);
+        graphics.lineTo(V3.x - segHalfW, V3.y - segQuarterH);
+        graphics.strokePath();
+        
+        graphics.beginPath();
+        graphics.moveTo(V3.x, V3.y);
+        graphics.lineTo(V3.x + segHalfW, V3.y - segQuarterH);
+        graphics.strokePath();
+
+        // Left corner (V4)
+        graphics.beginPath();
+        graphics.moveTo(V4.x, V4.y);
+        graphics.lineTo(V4.x + segHalfW, V4.y - segQuarterH);
+        graphics.strokePath();
+
+        graphics.beginPath();
+        graphics.moveTo(V4.x, V4.y);
+        graphics.lineTo(V4.x + segHalfW, V4.y + segQuarterH);
+        graphics.strokePath();
+
+        return graphics;
     }
 
-    hitPlayer(player, obstacle) {
-        this.addExplosion(player.x, player.y);
-        player.hit(obstacle.getPower());
-        obstacle.die();
+    moveUnit(unit, targetX, targetY) {
+        if (this.isMoving) {
+            return;
+        }
+        this.clearHighlights();
 
-        this.GameOver();
+        this.units.forEach(otherUnit => {
+            if (otherUnit !== unit) {
+                this.easystar.avoidAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
+            }
+        });
+
+        this.easystar.findPath(unit.gridPos.x, unit.gridPos.y, targetX, targetY, (path) => {
+            if (path && path.length > 1) {
+                const truncatedPath = path.slice(0, Math.min(path.length, unit.stats.moveRange + 1));
+                this.moveCharacterAlongPath(unit, truncatedPath);
+            } else {
+                console.log("Path was not found or is too short.");
+            }
+
+            this.units.forEach(otherUnit => {
+                if (otherUnit !== unit) {
+                    this.easystar.stopAvoidingAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
+                }
+            });
+        });
+        this.easystar.calculate();
     }
 
-    hitEnemy(bullet, enemy) {
-        this.updateScore(10);
-        bullet.remove();
-        enemy.hit(bullet.getPower());
+    moveCharacterAlongPath(unit, path, onCompleteCallback) {
+        if (!path || path.length <= 1) {
+            if (onCompleteCallback) onCompleteCallback();
+            return;
+        }
+
+            this.isMoving = true;
+        
+            this.events.emit('unit_is_moving');
+        
+            if (unit.isPlayer) {            this.events.emit('player_action_selected');
+        }
+
+        const screenPath = path.map(pos => ({
+            x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
+            y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT,
+        }));
+
+        const movementPath = new Phaser.Curves.Path(screenPath[0].x, screenPath[0].y);
+        for (let i = 1; i < screenPath.length; i++) {
+            movementPath.lineTo(screenPath[i].x, screenPath[i].y);
+        }
+
+        const duration = 200 * (path.length - 1);
+        const follower = { t: 0, vec: new Phaser.Math.Vector2() };
+
+        this.tweens.add({
+            targets: follower,
+            t: 1,
+            duration: duration,
+            ease: 'Linear',
+            onUpdate: () => {
+                movementPath.getPoint(follower.t, follower.vec);
+                unit.sprite.setPosition(follower.vec.x, follower.vec.y);
+            },
+            onComplete: () => {
+                const lastPos = path[path.length - 1];
+                unit.gridPos.x = lastPos.x;
+                unit.gridPos.y = lastPos.y;
+                this.isMoving = false;
+
+                // Stop any existing selection tween on this unit
+                if (this.activeUnitTween && this.activePlayerUnit === unit) {
+                    this.activeUnitTween.stop();
+                }
+
+                // Update the 'originalY' for the new position
+                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
+                unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
+                unit.sprite.setData('originalY', newOriginalY);
+
+                if (unit.isPlayer) {
+                    const move = unit.moves.find(m => m.type === 'move');
+                    if (move) {
+                        unit.stats.currentAp -= move.cost;
+                        move.currentCooldown = move.cooldown;
+                    }
+                    unit.hasMoved = true;
+                    this.events.emit('unit_stats_changed', unit);
+                    this.events.emit('player_action_completed');
+                    this.playerActionState = 'SELECTING_ACTION';
+
+                    // If this unit is still the active one, restart its bobbing tween
+                    if (this.activePlayerUnit === unit) {
+                        this.activeUnitTween = this.tweens.add({
+                            targets: this.activePlayerUnit.sprite,
+                            y: newOriginalY - 3,
+                            duration: 500,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                    }
+                }
+
+                if (onCompleteCallback) onCompleteCallback();
+            }
+        });
     }
 
-    updateScore(points) {
-        this.score += points;
-        this.scoreText.setText(`Score: ${this.score}`);
+    buildTurnOrder() {
+        this.turnOrder = [...this.units].sort((a, b) => b.stats.speed - a.stats.speed);
     }
 
-    GameOver() {
-        this.gameStarted = false;
-        this.gameOverText.setVisible(true);
+    updateCooldowns(unit) {
+        unit.moves.forEach(move => {
+            if (move.currentCooldown > 0) {
+                move.currentCooldown--;
+            }
+        });
     }
-}
+
+    startNextTurn() {
+        if (this.turnOrder.length === 0) return;
+
+        if (this.turnIndex === 0) {
+            // New round is starting, update all cooldowns
+            this.units.forEach(unit => this.updateCooldowns(unit));
+        }
+
+        const currentUnit = this.turnOrder[this.turnIndex];
+
+        // Decrement status effect durations for the current unit
+        currentUnit.statusEffects.forEach(effect => {
+            effect.duration--;
+        });
+        // Remove expired effects
+        currentUnit.statusEffects = currentUnit.statusEffects.filter(effect => effect.duration > 0);
+
+        this.events.emit('turn_changed', this.turnIndex);
+
+        if (currentUnit.isPlayer) {
+            this.startPlayerUnitTurn(currentUnit);
+        } else {
+            this.startEnemyTurn(currentUnit);
+        }
+    }
+
+    deactivateCurrentPlayerUnitSelection() {
+        if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
+            this.tweens.killTweensOf(this.activePlayerUnit.sprite);
+            this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
+        }
+        this.activeUnitTween = null; // Clear the reference
+        this.activePlayerUnit = null;
+        this.clearHighlights(); // Also clear highlights when deselecting
+    }
+
+    activatePlayerUnit(unit) {
+        // If the same unit is activated again, do nothing.
+        if (this.activePlayerUnit === unit) {
+            return;
+        }
+
+        // Deactivate any previously active unit.
+        this.deactivateCurrentPlayerUnitSelection();
+
+        // Kill any lingering tweens (like hover) on the new unit.
+        this.tweens.killTweensOf(unit.sprite);
+
+        // Set the new active unit.
+        this.activePlayerUnit = unit;
+        this.events.emit('player_unit_selected', unit);
+
+        // Start the bobbing selection tween for the new active unit.
+        this.activeUnitTween = this.tweens.add({
+            targets: this.activePlayerUnit.sprite,
+            y: this.activePlayerUnit.sprite.getData('originalY') - 3,
+            duration: 500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
+    }
+
+    startPlayerUnitTurn(unit) {
+        this.gameState = 'PLAYER_TURN';
+        this.playerActionState = 'SELECTING_ACTION';
+
+        // This is the start of the player phase. Reset all player units.
+        this.playerUnits.forEach(pUnit => {
+            pUnit.stats.currentAp = pUnit.stats.maxAp;
+            pUnit.hasMoved = false;
+            pUnit.usedStandardAction = false;
+            this.events.emit('unit_stats_changed', pUnit);
+        });
+
+        // Activate the specific unit whose turn it is according to the turn order.
+        this.activatePlayerUnit(unit);
+
+        this.events.emit('player_turn_started', this.activePlayerUnit);
+    }
+
+    endFullPlayerTurn() {
+        this.clearHighlights();
+        this.playerActionState = null;
+        if (this.activeUnitTween) {
+            this.activeUnitTween.stop();
+            if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
+                 this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
+            }
+        }
+        this.activePlayerUnit = null;
+        this.events.emit('player_turn_ended');
+
+        // Find the next enemy in the turn order, starting from the current position
+        let nextIndex = (this.turnIndex + 1) % this.turnOrder.length;
+        let looped = false;
+        while (nextIndex !== this.turnIndex || !looped) {
+            if(nextIndex === this.turnIndex) looped = true;
+            if (!this.turnOrder[nextIndex].isPlayer) {
+                this.turnIndex = nextIndex;
+                this.startNextTurn();
+                return;
+            }
+            nextIndex = (nextIndex + 1) % this.turnOrder.length;
+        }
+
+        // If no enemy was found in a full loop, it means there are no enemies.
+        // We should start the next round with the first unit.
+        this.turnIndex = 0;
+        this.startNextTurn();
+    }
+
+    onActionSelected(move) {
+        if (move.currentCooldown > 0) return;
+        if (move.type === 'attack' && this.activePlayerUnit.usedStandardAction) return;
+        if (move.type === 'arrow_attack' && this.activePlayerUnit.usedStandardAction) return;
+        if (move.type === 'move' && this.activePlayerUnit.hasMoved) return;
+        if (this.activePlayerUnit.stats.currentAp < move.cost) return;
+
+        this.activeMove = move;
+        this.playerActionState = move.type;
+        this.events.emit('player_action_selected');
+
+        if (move.type === 'attack' || move.type === 'arrow_attack') {
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0xff0000);
+            this.highlightAttackableEnemies(move.range);
+        } else if (move.type === 'move') {
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x0000ff);
+        } else if (move.type === 'enhance_armor') {
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x00ff99); // Show ability range
+            this.highlightFriendlyTargets(move.range);
+        }
+    }
+
+    cancelPlayerAction() {
+        if (this.gameState === 'PLAYER_TURN' && this.playerActionState !== 'SELECTING_ACTION') {
+            this.clearHighlights();
+            this.playerActionState = 'SELECTING_ACTION';
+            this.events.emit('action_cancelled');
+        }
+    }
+
+    highlightRange(startPos, range, color) {
+        this.clearHighlights();
+        
+        // Add the starting tile itself as a valid action tile and highlight it
+        this.validActionTiles.push(startPos);
+        const startScreenX = this.origin.x + (startPos.x - startPos.y) * this.mapConsts.HALF_WIDTH + 2;
+        const startScreenY = this.origin.y + (startPos.x + startPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
+        const startIndicator = this.createIsometricIndicator(startScreenX, startScreenY, color, 0.2);
+        startIndicator.disableInteractive();
+        startIndicator.setDepth(startPos.x + startPos.y + 0.5);
+        this.rangeHighlights.push(startIndicator);
+
+        const openList = [{pos: startPos, cost: 0}];
+        const closedList = new Set();
+        closedList.add(`${startPos.x},${startPos.y}`);
+
+        const enemyPositions = new Set();
+        if (color === 0x0000ff) { // Only avoid enemies for move highlights
+            this.units.forEach(unit => {
+                if (unit !== this.activePlayerUnit) {
+                    enemyPositions.add(`${unit.gridPos.x},${unit.gridPos.y}`);
+                }
+            });
+        }
+
+
+        while (openList.length > 0) {
+            const current = openList.shift();
+            if (current.cost >= range) continue;
+            const neighbors = [
+                {x: current.pos.x + 1, y: current.pos.y}, {x: current.pos.x - 1, y: current.pos.y},
+                {x: current.pos.x, y: current.pos.y + 1}, {x: current.pos.x, y: current.pos.y - 1}
+            ];
+
+            for (const neighbor of neighbors) {
+                const posKey = `${neighbor.x},${neighbor.y}`;
+                if (closedList.has(posKey)) continue;
+
+                if (enemyPositions.has(posKey)) continue;
+
+                if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
+                    neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
+                    this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x])) {
+
+                    closedList.add(posKey);
+                    openList.push({pos: neighbor, cost: current.cost + 1});
+                    this.validActionTiles.push(neighbor); // Store the valid tile
+
+                    const screenX = this.origin.x + (neighbor.x - neighbor.y) * this.mapConsts.HALF_WIDTH + 2;
+                    const screenY = this.origin.y + (neighbor.x + neighbor.y) * this.mapConsts.QUARTER_HEIGHT - 6;
+                    const indicator = this.createIsometricIndicator(screenX, screenY, color, 0.2);
+                    indicator.disableInteractive();
+                    indicator.setDepth(neighbor.x + neighbor.y + 0.5);
+                    this.rangeHighlights.push(indicator);
+                }
+            }
+        }
+    }
+
+    highlightFriendlyTargets(range) {
+        for (const unit of this.playerUnits) {
+            // A unit can cast on itself
+            const distance = Math.abs(this.activePlayerUnit.gridPos.x - unit.gridPos.x) + Math.abs(this.activePlayerUnit.gridPos.y - unit.gridPos.y);
+            if (distance <= range) {
+                unit.sprite.setTint(0x00ff00); // Green tint for valid targets
+            }
+        }
+    }
+
+    highlightAttackableEnemies(range) {
+        const enemies = this.units.filter(u => !u.isPlayer);
+        for (const enemy of enemies) {
+            const distance = Math.abs(this.activePlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(this.activePlayerUnit.gridPos.y - enemy.gridPos.y);
+            if (distance <= range) {
+                enemy.sprite.setTint(0xff0000);
+            }
+        }
+    }
+
+    clearHighlights() {
+        this.units.forEach(u => u.sprite.clearTint());
+        if (this.rangeHighlights) {
+            this.rangeHighlights.forEach(h => h.destroy());
+            this.rangeHighlights = [];
+        }
+        if (this.hoverIndicator) {
+            this.hoverIndicator.destroy();
+            this.hoverIndicator = null;
+        }
+        this.validActionTiles = [];
+    }
+
+    getUnitAtGridPos(gridPos) {
+        for (const unit of this.units) {
+            if (unit.gridPos.x === gridPos.x && unit.gridPos.y === gridPos.y) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    getUnitAtScreenPos(screenX, screenY) {
+        for (const unit of this.units) {
+            if (unit.sprite.getBounds().contains(screenX, screenY)) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    startEnemyTurn(enemy) {
+        this.gameState = 'ENEMY_TURN';
+        this.takeEnemyTurn(enemy, () => {
+            this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
+            this.startNextTurn();
+        });
+    }
+
+    takeEnemyTurn(enemy, onTurnComplete) {
+        const attackMove = enemy.moves.find(m => m.type === 'attack');
+
+        // Find the closest player unit
+        let closestPlayerUnit = null;
+        let minDistance = Infinity;
+        for (const playerUnit of this.playerUnits) {
+            const distance = Math.abs(playerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(playerUnit.gridPos.y - enemy.gridPos.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPlayerUnit = playerUnit;
+            }
+        }
+
+        if (!closestPlayerUnit) {
+            onTurnComplete();
+            return;
+        }
+
+        const doAttack = (callback) => {
+            const dx = closestPlayerUnit.gridPos.x - enemy.gridPos.x;
+            const dy = closestPlayerUnit.gridPos.y - enemy.gridPos.y;
+            if (dx < 0 || (dx === 0 && dy < 0)) {
+                enemy.sprite.flipX = true;
+            } else {
+                enemy.sprite.flipX = false;
+            }
+
+            enemy.attack(closestPlayerUnit, () => {
+                const damageInfo = enemy.calculateDamage(closestPlayerUnit);
+                closestPlayerUnit.takeDamage(damageInfo, enemy, attackMove);
+                if (callback) {
+                    this.time.delayedCall(300, callback, []);
+                }
+            });
+        };
+
+        const distanceToTarget = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
+
+        if (distanceToTarget <= attackMove.range) {
+            doAttack(onTurnComplete);
+        } else {
+            const targetableTiles = [];
+            const neighbors = [
+                {x: closestPlayerUnit.gridPos.x + 1, y: closestPlayerUnit.gridPos.y}, {
+                    x: closestPlayerUnit.gridPos.x - 1,
+                    y: closestPlayerUnit.gridPos.y
+                },
+                {x: closestPlayerUnit.gridPos.x, y: closestPlayerUnit.gridPos.y + 1}, {
+                    x: closestPlayerUnit.gridPos.x,
+                    y: closestPlayerUnit.gridPos.y - 1
+                }
+            ];
+
+            const occupiedPositions = new Set(this.units.map(u => `${u.gridPos.x},${u.gridPos.y}`));
+
+            for (const neighbor of neighbors) {
+                if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
+                    neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
+                    this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x]) &&
+                    !occupiedPositions.has(`${neighbor.x},${neighbor.y}`)) {
+                    targetableTiles.push(neighbor);
+                }
+            }
+
+            if (targetableTiles.length > 0) {
+                const target = targetableTiles.sort((a, b) => {
+                    const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
+                    const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
+                    return distA - distB;
+                })[0];
+
+                this.units.forEach(unit => {
+                    if (unit !== enemy) {
+                        this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                    }
+                });
+                this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
+                    if (path && path.length > 1) {
+                        const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
+                        this.moveCharacterAlongPath(enemy, truncatedPath, () => {
+                            const newDistance = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
+                            if (newDistance <= attackMove.range) {
+                                doAttack(onTurnComplete);
+                            } else {
+                                onTurnComplete();
+                            }
+                        });
+                    } else {
+                        onTurnComplete();
+                    }
+                    this.units.forEach(unit => {
+                        if (unit !== enemy) {
+                            this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                        }
+                    });
+                });
+                this.easystar.calculate();
+            } else {
+                onTurnComplete();
+            }
+        }
+    }
+
+
+    onUnitDied(unit) {
+        if (unit.isPlayer) {
+            const playerUnitIndex = this.playerUnits.indexOf(unit);
+            if (playerUnitIndex > -1) {
+                this.playerUnits.splice(playerUnitIndex, 1);
+            }
+
+            if (this.playerUnits.length === 0) {
+                this.scene.stop('ActionUI');
+                this.scene.stop('TimelineUI');
+                this.scene.start('GameOver');
+                return;
+            }
+        }
+
+        const unitIndex = this.units.indexOf(unit);
+        if (unitIndex > -1) {
+            this.units.splice(unitIndex, 1);
+        }
+
+        this.buildTurnOrder();
+        if (this.turnIndex >= this.turnOrder.length) {
+            this.turnIndex = 0;
+        }
+        this.events.emit('turn_changed', this.turnIndex);
+    }
+
+        makeUnitInteractive(unit) {
+        unit.sprite.setInteractive({ useHandCursor: true });
+
+        // This listener handles clicks on this specific unit's sprite
+        unit.sprite.on('pointerdown', (pointer) => {
+            if (this.isMoving) return;
+    
+            // Right-click for unit details is always available
+            if (pointer.rightButtonDown()) {
+                pointer.event.stopPropagation();
+                const stats = unit.stats;
+                const effects = unit.statusEffects.map(e => `  - ${e.type.replace('_', ' ')} (${e.duration} turns left)`).join('\n') || '  - None';
+                const statsText = 
+`Name: ${unit.name}
+HP: ${stats.currentHealth} / ${stats.maxHealth}
+AP: ${stats.currentAp} / ${stats.maxAp}
+
+Damage: ${stats.physicalDamage}
+Crit Chance: ${Math.round(stats.critChance * 100)}%
+Armor: ${stats.armor}
+
+Movement: ${stats.moveRange}
+Speed: ${stats.speed}
+
+Status Effects:
+${effects}`;
+
+                const actionUI = this.scene.get('ActionUI');
+                if (actionUI) {
+                    actionUI.showCenteredTooltip(statsText);
+                }
+                return;
+            }
+
+            // Left-click logic is only for player's turn
+            if (this.gameState !== 'PLAYER_TURN') return;
+            
+            // Stop the event from propagating to the main input handler (for tile clicks)
+            pointer.event.stopPropagation();
+            
+            // If no targeting action is active, this click is for selection.
+            if (this.playerActionState === 'SELECTING_ACTION' && unit.isPlayer) {
+                this.activatePlayerUnit(unit);
+            }
+        });
+
+        // Hover effects for all units
+        unit.sprite.on('pointerover', () => {
+            // Only apply hover effect if it's a player unit AND not the currently active one
+            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                // Kill any existing tweens to prevent conflicts before starting the new one.
+                this.tweens.killTweensOf(unit.sprite);
+    
+                // Start the bobbing hover tween
+                this.tweens.add({
+                    targets: unit.sprite,
+                    y: unit.sprite.getData('originalY') - 5, // Float up slightly
+                    duration: 500,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+            }
+        });
+    
+        unit.sprite.on('pointerout', () => {
+            // Only reset hover effect if it's a player unit AND not the currently active one
+            if (unit.isPlayer && this.activePlayerUnit !== unit) {
+                // Kill all tweens on the sprite (i.e., the hover tween).
+                this.tweens.killTweensOf(unit.sprite);
+                // Reset the Y position to its original.
+                unit.sprite.setY(unit.sprite.getData('originalY'));
+            }
+        });
+    }}
