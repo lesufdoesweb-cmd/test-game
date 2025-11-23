@@ -309,6 +309,9 @@ export class Game extends Phaser.Scene {
             ease: 'Sine.easeInOut', // Smooth easing
             repeat: -1 // Loop indefinitely (animates up, then snaps back and repeats)
         });
+
+        // Disable the browser's context menu on right-click
+        this.input.mouse.disableContextMenu();
     }
 
     performEnhanceArmor(targetUnit) {
@@ -319,7 +322,7 @@ export class Game extends Phaser.Scene {
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
     
-        targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration });
+        targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration, amount: move.amount });
         
         this.clearHighlights();
         this.playerActionState = 'SELECTING_ACTION';
@@ -979,10 +982,37 @@ export class Game extends Phaser.Scene {
 
         // This listener handles ALL clicks on this specific unit's sprite
         unit.sprite.on('pointerdown', (pointer) => {
-            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) {
+            if (this.isMoving) return;
+    
+            // Right-click for unit details
+            if (pointer.rightButtonDown()) {
+                pointer.event.stopPropagation();
+                const stats = unit.stats;
+                const effects = unit.statusEffects.map(e => `  - ${e.type.replace('_', ' ')} (${e.duration} turns left)`).join('\n') || '  - None';
+                const statsText = 
+`Name: ${unit.name}
+HP: ${stats.currentHealth} / ${stats.maxHealth}
+AP: ${stats.currentAp} / ${stats.maxAp}
+
+Damage: ${stats.physicalDamage}
+Crit Chance: ${Math.round(stats.critChance * 100)}%
+Armor: ${stats.armor}
+
+Movement: ${stats.moveRange}
+Speed: ${stats.speed}
+
+Status Effects:
+${effects}`;
+
+                const actionUI = this.scene.get('ActionUI');
+                if (actionUI) {
+                    actionUI.showCenteredTooltip(statsText);
+                }
                 return;
             }
-    
+
+            if (this.gameState !== 'PLAYER_TURN') return;
+            
             // Stop the event from propagating to the main input handler (for tile clicks)
             pointer.event.stopPropagation();
             
@@ -1026,13 +1056,6 @@ export class Game extends Phaser.Scene {
                     repeat: -1
                 });
             }
-            
-            const actionUI = this.scene.get('ActionUI');
-            if (!actionUI) return;
-    
-            const stats = unit.stats;
-            const statsText = `Name: ${unit.name}\nHP: ${stats.currentHealth} / ${stats.maxHealth}\nDMG: ${stats.physicalDamage}\nMOV: ${stats.moveRange}`;
-            actionUI.showGameTooltip(statsText, unit.sprite.x, unit.sprite.y, unit.sprite.displayWidth, unit.sprite.displayHeight);
         });
     
         unit.sprite.on('pointerout', () => {
@@ -1043,9 +1066,5 @@ export class Game extends Phaser.Scene {
                 // Reset the Y position to its original.
                 unit.sprite.setY(unit.sprite.getData('originalY'));
             }
-    
-            const actionUI = this.scene.get('ActionUI');
-            if (!actionUI) return;
-            actionUI.hideGameTooltip();
         });
     }}

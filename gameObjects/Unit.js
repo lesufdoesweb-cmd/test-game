@@ -16,6 +16,7 @@ export class Unit {
             currentAp: 1,
             critChance: 0.05,
             critDamageMultiplier: 1.5,
+            armor: 0,
             ...stats
         };
 
@@ -87,6 +88,18 @@ export class Unit {
         this.statusEffects.push(effect);
     }
 
+    getEffectiveStats() {
+        const effectiveStats = { ...this.stats };
+
+        this.statusEffects.forEach(effect => {
+            if (effect.type === 'armor_up') {
+                effectiveStats.armor += effect.amount || 0;
+            }
+        });
+
+        return effectiveStats;
+    }
+    
     update() {
         // This method will be called from the main game update loop
         this.sprite.setDepth(this.sprite.y + 16);
@@ -125,18 +138,27 @@ export class Unit {
 
     calculateDamage(targetUnit) {
         const baseDamage = this.stats.physicalDamage;
-        
-        // 1. Damage Variance (+/- 20%)
-        const variance = (Math.random() - 0.5) * 0.4; // -0.2 to +0.2
-        let finalDamage = baseDamage * (1 + variance);
+        const targetStats = targetUnit.getEffectiveStats();
+
+        // 1. Damage Variance (+/- 10%) to make it less random
+        const variance = (Math.random() - 0.5) * 0.2; // -0.1 to +0.1
+        let damage = baseDamage * (1 + variance);
 
         // 2. Critical Hit Check
         const isCrit = Math.random() < this.stats.critChance;
         if (isCrit) {
-            finalDamage *= this.stats.critDamageMultiplier;
+            damage *= this.stats.critDamageMultiplier;
         }
 
-        return { damage: finalDamage, isCrit: isCrit };
+        // 3. Armor Reduction
+        let damageMultiplier = 1;
+        for (let i = 1; i <= targetStats.armor; i++) {
+            damageMultiplier *= (1 - (1 / (3 * i + 2)));
+        }
+        damage *= damageMultiplier;
+        
+        // 4. Return integer damage
+        return { damage: Math.floor(damage), isCrit: isCrit };
     }
 
     attack(target, onComplete) {
@@ -206,14 +228,8 @@ export class Unit {
 
     takeDamage(damageInfo, attacker = null, move = null) {
         const { damage, isCrit } = damageInfo;
-        let finalDamage = damage;
-        
-        // Check for damage reduction effects
-        const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
-        if (armorUpEffect) {
-            finalDamage *= 0.7; // 30% damage reduction
-        }
-
+        const finalDamage = Math.floor(damage); // Ensure integer damage
+    
         this.stats.currentHealth -= finalDamage;
         if (this.stats.currentHealth < 0) {
             this.stats.currentHealth = 0;
@@ -237,7 +253,7 @@ export class Unit {
         }
 
         // Damage Number Text
-        const damageString = Math.round(finalDamage).toString();
+        const damageString = finalDamage.toString();
         const textColor = isCrit ? '#ffff00' : '#ff0000'; // Yellow for crit, red for normal
         const textStyle = {
             fontFamily: '"Pixelify Sans"',

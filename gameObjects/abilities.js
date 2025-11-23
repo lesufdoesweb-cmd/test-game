@@ -36,6 +36,7 @@ export const ABILITIES = {
         cost: 1,
         cooldown: 4,
         currentCooldown: 0,
+        amount: 1,
         icon: ASSETS.image.armor_up_icon.key
     }
 };

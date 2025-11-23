@@ -93,6 +93,14 @@ export default {
         melee_slash_effect: {
             key: 'melee_slash_effect',
             args: ['src/assets/projectiles/melee_slash.png']
+        },
+        tooltip_bg: {
+            key: 'tooltip_bg',
+            args: ['src/assets/user_interface/bg_tooltip.png']
+        },
+        bg_character_info: {
+            key: 'bg_character_info',
+            args: ['src/assets/user_interface/bg_character_info.png']
         }
     },
     'spritesheet': {
