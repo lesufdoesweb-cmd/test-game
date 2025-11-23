@@ -101,6 +101,14 @@ export default {
         bg_character_info: {
             key: 'bg_character_info',
             args: ['src/assets/user_interface/bg_character_info.png']
+        },
+        basic_button: {
+            key: 'basic_button',
+            args: ['src/assets/user_interface/basic_button.png']
+        },
+        bg_fights: {
+            key: 'bg_fights',
+            args: ['src/assets/backgrounds/bg_fights.png']
         }
     },
     'spritesheet': {

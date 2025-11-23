@@ -51,6 +51,14 @@ export class Game extends Phaser.Scene {
         this.mapConsts.MAP_SIZE_X = levelData.mapSize.width;
         this.mapConsts.MAP_SIZE_Y = levelData.mapSize.height;
 
+        // Add the combat background image
+        const { width, height } = this.scale;
+        const bgImage = this.add.image(width / 2, height / 2, 'bg_fights');
+        const scaleX = width / bgImage.width;
+        const scaleY = height / bgImage.height;
+        const scale = Math.max(scaleX, scaleY);
+        bgImage.setScale(scale).setDepth(-1);
+
         this.origin.x = this.scale.width / 2;
         this.origin.y = this.scale.height / 2 - 100;
 
@@ -253,8 +261,8 @@ export class Game extends Phaser.Scene {
 
 
         this.input.on('pointerdown', (pointer) => {
-            if (this.gameState !== 'PLAYER_TURN') return;
-
+            if (this.gameState !== 'PLAYER_TURN' || this.isMoving) return;
+        
             if (pointer.middleButtonDown()) {
                 this.isMiddleButtonDown = true;
                 this.lastCameraX = this.cameras.main.scrollX;
@@ -267,17 +275,35 @@ export class Game extends Phaser.Scene {
                 this.cancelPlayerAction();
                 return;
             }
-            
-            // This global listener now only handles clicks on empty tiles, i.e., for moving.
-            if (pointer.leftButtonDown() && !this.isMoving && this.playerActionState === 'move') {
+        
+            if (pointer.leftButtonDown()) {
                 const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
         
-                if (gridPos.x >= 0 && gridPos.x < this.mapConsts.MAP_SIZE_X && gridPos.y >= 0 && gridPos.y < this.mapConsts.MAP_SIZE_Y) {
-                    // Check if the tile is valid for movement (from the highlights)
-                    const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
-                    if (isTileValid) {
-                        this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
+                if (gridPos.x < 0 || gridPos.x >= this.mapConsts.MAP_SIZE_X || gridPos.y < 0 || gridPos.y >= this.mapConsts.MAP_SIZE_Y) {
+                    return; // Click outside map bounds
+                }
+        
+                // Check if the tile is a valid action tile for the current state
+                const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
+                if (!isTileValid) {
+                    return; // Clicked on an invalid tile for the current action
+                }
+        
+                // --- Handle action based on state ---
+                if (this.playerActionState === 'move') {
+                    this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
+        
+                } else if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
+                    const targetUnit = this.getUnitAtGridPos(gridPos);
+                    if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0xff0000) { // Check tint, which confirms it's a valid highlighted target
+                        this.performPlayerAttack(targetUnit);
+                    }
+        
+                } else if (this.playerActionState === 'enhance_armor') {
+                    const targetUnit = this.getUnitAtGridPos(gridPos);
+                    if (targetUnit && targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0x00ff00) { // Check tint
+                        this.performEnhanceArmor(targetUnit);
                     }
                 }
             }
@@ -374,7 +400,7 @@ export class Game extends Phaser.Scene {
         }
 
         const actionState = this.playerActionState;
-        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack') {
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor') {
             const pointer = this.input.activePointer;
             const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
@@ -382,7 +408,10 @@ export class Game extends Phaser.Scene {
             const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
 
             if (isTileValid) {
-                const color = (actionState === 'move') ? 0xffffff : 0xff0000;
+                let color = 0xffffff; // Default for move
+                if (actionState === 'attack' || actionState === 'arrow_attack') color = 0xff0000;
+                if (actionState === 'enhance_armor') color = 0x00ff99;
+
                 const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
                 const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
 
@@ -748,6 +777,16 @@ export class Game extends Phaser.Scene {
 
     highlightRange(startPos, range, color) {
         this.clearHighlights();
+        
+        // Add the starting tile itself as a valid action tile and highlight it
+        this.validActionTiles.push(startPos);
+        const startScreenX = this.origin.x + (startPos.x - startPos.y) * this.mapConsts.HALF_WIDTH + 2;
+        const startScreenY = this.origin.y + (startPos.x + startPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
+        const startIndicator = this.createIsometricIndicator(startScreenX, startScreenY, color, 0.2);
+        startIndicator.disableInteractive();
+        startIndicator.setDepth(startPos.x + startPos.y + 0.5);
+        this.rangeHighlights.push(startIndicator);
+
         const openList = [{pos: startPos, cost: 0}];
         const closedList = new Set();
         closedList.add(`${startPos.x},${startPos.y}`);
@@ -826,6 +865,15 @@ export class Game extends Phaser.Scene {
             this.hoverIndicator = null;
         }
         this.validActionTiles = [];
+    }
+
+    getUnitAtGridPos(gridPos) {
+        for (const unit of this.units) {
+            if (unit.gridPos.x === gridPos.x && unit.gridPos.y === gridPos.y) {
+                return unit;
+            }
+        }
+        return null;
     }
 
     getUnitAtScreenPos(screenX, screenY) {
@@ -980,11 +1028,11 @@ export class Game extends Phaser.Scene {
         makeUnitInteractive(unit) {
         unit.sprite.setInteractive({ useHandCursor: true });
 
-        // This listener handles ALL clicks on this specific unit's sprite
+        // This listener handles clicks on this specific unit's sprite
         unit.sprite.on('pointerdown', (pointer) => {
             if (this.isMoving) return;
     
-            // Right-click for unit details
+            // Right-click for unit details is always available
             if (pointer.rightButtonDown()) {
                 pointer.event.stopPropagation();
                 const stats = unit.stats;
@@ -1011,28 +1059,12 @@ ${effects}`;
                 return;
             }
 
+            // Left-click logic is only for player's turn
             if (this.gameState !== 'PLAYER_TURN') return;
             
             // Stop the event from propagating to the main input handler (for tile clicks)
             pointer.event.stopPropagation();
             
-            // --- Targeting Logic ---
-            // Check if we are in a targeting state
-            if (this.playerActionState === 'enhance_armor') {
-                if (unit.isPlayer && unit.sprite.tint === 0x00ff00) {
-                    this.performEnhanceArmor(unit);
-                }
-                // If the target is invalid, do nothing, forcing a cancel.
-                return;
-            }
-            if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
-                if (!unit.isPlayer && unit.sprite.tint === 0xff0000) {
-                    this.performPlayerAttack(unit);
-                }
-                return;
-            }
-            
-            // --- Selection Logic ---
             // If no targeting action is active, this click is for selection.
             if (this.playerActionState === 'SELECTING_ACTION' && unit.isPlayer) {
                 this.activatePlayerUnit(unit);

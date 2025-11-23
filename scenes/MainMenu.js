@@ -9,8 +9,8 @@ export class MainMenu extends Phaser.Scene {
         const container = this.add.container(width / 2, y);
         const background = this.add.image(0, 0, 'button_background');
         background.setScale(0.8)
-        const label = this.add.text(0, 0, text, {
-            fontSize: '45px',
+        const label = this.add.text(0, -10, text, {
+            fontSize: '55px',
             fill: '#ffffff',
             fontFamily: 'Pixelify-Sans'
         }).setOrigin(0.5);

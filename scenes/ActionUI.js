@@ -131,7 +131,7 @@ export class ActionUI extends Phaser.Scene {
 
         const padding = 50;
         const text = this.add.text(padding, 0, content, {
-            fontSize: '28px',
+            fontSize: '35px',
             fill: '#000',
             wordWrap: { width: tooltipWidth - (padding * 2) }, // Adjusted to fit image width
             fontFamily: 'Pixelify-Sans',
@@ -182,21 +182,86 @@ export class ActionUI extends Phaser.Scene {
     }
 
     createButtons() {
-        const barTopY = this.scale.height - 16 * 6 - 10;
-        this.skipTurnButton = this.add.text(this.scale.width - 200, barTopY - 60, 'End Turn', {
-            fontSize: '36px', backgroundColor: '#333', padding: { x: 20, y: 10 }, fontFamily: 'Pixelify-Sans'
-        }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
+        const buttonPadding = { x: 40, y: 20 }; // Internal padding for the button's content
+        const textStyle = {
+            fontSize: '36px',
+            fill: '#fff',
+            fontFamily: 'Pixelify-Sans',
+            align: 'center'
+        };
+
+        // --- Skip Turn Button ---
+        const skipTurnText = this.add.text(0, 0, 'End Turn', textStyle).setOrigin(0.5);
+        const skipTurnButtonWidth = skipTurnText.width + buttonPadding.x;
+        const skipTurnButtonHeight = skipTurnText.height + buttonPadding.y;
+        const skipTurnBackground = this.add.nineslice(
+            0, 0, 'basic_button', 0, skipTurnButtonWidth, skipTurnButtonHeight, 8, 8, 8, 8
+        ).setOrigin(0.5);
+        
+        const skipTurnButtonInitialY = this.scale.height - 16 * 6 - 10 - 60;
+        this.skipTurnButton = this.add.container(
+            this.scale.width - 200, skipTurnButtonInitialY,
+            [skipTurnBackground, skipTurnText]
+        );
+        this.skipTurnButton.setSize(skipTurnButtonWidth, skipTurnButtonHeight);
+        this.skipTurnButton.setInteractive({ useHandCursor: true });
+        this.skipTurnButton.setVisible(false).setDepth(10002);
 
         this.skipTurnButton.on('pointerdown', () => {
             this.gameScene.events.emit('skip_turn');
         });
+        this.skipTurnButton.on('pointerover', () => {
+            this.tweens.add({
+                targets: this.skipTurnButton,
+                y: skipTurnButtonInitialY - 8,
+                duration: 150,
+                ease: 'Sine.easeOut'
+            });
+        });
+        this.skipTurnButton.on('pointerout', () => {
+            this.tweens.add({
+                targets: this.skipTurnButton,
+                y: skipTurnButtonInitialY,
+                duration: 150,
+                ease: 'Sine.easeIn'
+            });
+        });
 
-        this.cancelActionButton = this.add.text(this.scale.width / 2, barTopY - 60, 'Cancel Action', {
-            fontSize: '36px', backgroundColor: '#800', padding: { x: 20, y: 10 }, fontFamily: 'Pixelify-Sans'
-        }).setInteractive({ useHandCursor: true }).setOrigin(0.5).setVisible(false).setDepth(10002);
+        // --- Cancel Action Button ---
+        const cancelActionText = this.add.text(0, 0, 'Cancel Action', textStyle).setOrigin(0.5);
+        const cancelActionButtonWidth = cancelActionText.width + buttonPadding.x;
+        const cancelActionButtonHeight = cancelActionText.height + buttonPadding.y;
+        const cancelActionBackground = this.add.nineslice(
+            0, 0, 'basic_button', 0, cancelActionButtonWidth, cancelActionButtonHeight, 8, 8, 8, 8
+        ).setOrigin(0.5);
+
+        const cancelActionButtonInitialY = this.scale.height - 16 * 6 - 10 - 60;
+        this.cancelActionButton = this.add.container(
+            this.scale.width / 2, cancelActionButtonInitialY,
+            [cancelActionBackground, cancelActionText]
+        );
+        this.cancelActionButton.setSize(cancelActionButtonWidth, cancelActionButtonHeight);
+        this.cancelActionButton.setInteractive({ useHandCursor: true });
+        this.cancelActionButton.setVisible(false).setDepth(10002);
 
         this.cancelActionButton.on('pointerdown', () => {
             this.gameScene.events.emit('action_cancelled');
+        });
+        this.cancelActionButton.on('pointerover', () => {
+            this.tweens.add({
+                targets: this.cancelActionButton,
+                y: cancelActionButtonInitialY - 8,
+                duration: 150,
+                ease: 'Sine.easeOut'
+            });
+        });
+        this.cancelActionButton.on('pointerout', () => {
+            this.tweens.add({
+                targets: this.cancelActionButton,
+                y: cancelActionButtonInitialY,
+                duration: 150,
+                ease: 'Sine.easeIn'
+            });
         });
     }
 
