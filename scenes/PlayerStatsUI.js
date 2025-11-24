@@ -14,12 +14,9 @@ export class PlayerStatsUI extends Phaser.Scene {
         bg.fillRoundedRect(20, 20, 400, 200, 16);
         bg.setScrollFactor(0);
 
-        this.statsText = this.add.text(40, 40, '', {
-            fontSize: '32px',
-            fill: '#ffffff',
-            fontFamily: 'Pixelify-Sans',
-            lineSpacing: 12
-        });
+        this.statsText = this.add.bitmapText(40, 40, 'editundo_55', '', 55);
+        this.statsText.setLineSpacing(12);
+        this.statsText.setScale(32 / 55);
         this.statsText.setScrollFactor(0); // Fix it to the camera
 
         // Listen for stats changes

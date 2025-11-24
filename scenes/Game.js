@@ -31,6 +31,7 @@ export class Game extends Phaser.Scene {
         this.rangeHighlights = [];
         this.validActionTiles = [];
         this.hoverIndicator = null;
+        this.selectedUnitIndicator = null;
 
         this.turnOrder = [];
         this.turnIndex = 0;
@@ -225,7 +226,7 @@ export class Game extends Phaser.Scene {
         });
 
         // --- Camera and Input ---
-        this.cameras.main.setZoom(4.5);
+        this.cameras.main.setZoom(2);
         this.cameras.main.setRoundPixels(true);
         this.cameras.main.centerOn(this.playerUnits[0].sprite.x, this.playerUnits[0].sprite.y);
 
@@ -661,6 +662,16 @@ export class Game extends Phaser.Scene {
                 unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
                 unit.sprite.setData('originalY', newOriginalY);
 
+                // --- NEW: Update the selected unit indicator ---
+                if (this.selectedUnitIndicator && this.activePlayerUnit === unit) {
+                    this.selectedUnitIndicator.destroy();
+                    const screenX = this.origin.x + (lastPos.x - lastPos.y) * this.mapConsts.HALF_WIDTH;
+                    const screenY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
+                    // Applying the user's manual offset here for consistency
+                    this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff);
+                    this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25);
+                }
+
                 if (unit.isPlayer) {
                     const move = unit.moves.find(m => m.type === 'move');
                     if (move) {
@@ -671,18 +682,6 @@ export class Game extends Phaser.Scene {
                     this.events.emit('unit_stats_changed', unit);
                     this.events.emit('player_action_completed');
                     this.playerActionState = 'SELECTING_ACTION';
-
-                    // If this unit is still the active one, restart its bobbing tween
-                    if (this.activePlayerUnit === unit) {
-                        this.activeUnitTween = this.tweens.add({
-                            targets: this.activePlayerUnit.sprite,
-                            y: newOriginalY - 3,
-                            duration: 500,
-                            ease: 'Sine.easeInOut',
-                            yoyo: true,
-                            repeat: -1
-                        });
-                    }
                 }
 
                 if (onCompleteCallback) onCompleteCallback();
@@ -733,6 +732,10 @@ export class Game extends Phaser.Scene {
             this.tweens.killTweensOf(this.activePlayerUnit.sprite);
             this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
         }
+        if (this.selectedUnitIndicator) { // NEW: Destroy indicator
+            this.selectedUnitIndicator.destroy();
+            this.selectedUnitIndicator = null;
+        }
         this.activeUnitTween = null; // Clear the reference
         this.activePlayerUnit = null;
         this.clearHighlights(); // Also clear highlights when deselecting
@@ -754,15 +757,11 @@ export class Game extends Phaser.Scene {
         this.activePlayerUnit = unit;
         this.events.emit('player_unit_selected', unit);
 
-        // Start the bobbing selection tween for the new active unit.
-        this.activeUnitTween = this.tweens.add({
-            targets: this.activePlayerUnit.sprite,
-            y: this.activePlayerUnit.sprite.getData('originalY') - 3,
-            duration: 500,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1
-        });
+        // --- Add blue corners for the selected unit ---
+        const screenX = this.origin.x + (unit.gridPos.x - unit.gridPos.y) * this.mapConsts.HALF_WIDTH;
+        const screenY = this.origin.y + (unit.gridPos.x + unit.gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
+        this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff); // Blue color
+        this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25); // Ensure it's *below* the unit, but above the tile
     }
 
     startPlayerUnitTurn(unit) {
@@ -1107,19 +1106,19 @@ export class Game extends Phaser.Scene {
                 const stats = unit.stats;
                 const effects = unit.statusEffects.map(e => `  - ${e.type.replace('_', ' ')} (${e.duration} turns left)`).join('\n') || '  - None';
                 const statsText = 
-`Name: ${unit.name}
-HP: ${stats.currentHealth} / ${stats.maxHealth}
-AP: ${stats.currentAp} / ${stats.maxAp}
-
-Damage: ${stats.physicalDamage}
-Crit Chance: ${Math.round(stats.critChance * 100)}%
-Armor: ${stats.armor}
-
-Movement: ${stats.moveRange}
-Speed: ${stats.speed}
-
-Status Effects:
-${effects}`;
+                    `Name: ${unit.name}
+                    HP: ${stats.currentHealth} / ${stats.maxHealth}
+                    AP: ${stats.currentAp} / ${stats.maxAp}
+                    
+                    Damage: ${stats.physicalDamage}
+                    Crit Chance: ${Math.round(stats.critChance * 100)}%
+                    Armor: ${stats.armor}
+                    
+                    Movement: ${stats.moveRange}
+                    Speed: ${stats.speed}
+                    
+                    Status Effects:
+                    ${effects}`;
 
                 const actionUI = this.scene.get('ActionUI');
                 if (actionUI) {

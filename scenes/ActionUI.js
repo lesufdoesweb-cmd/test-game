@@ -19,7 +19,7 @@ export class ActionUI extends Phaser.Scene {
 
         this.createActionBar();
         this.createButtons();
-        this.apText = this.add.text(20, this.scale.height - 60, '', { fontSize: '48px', fill: '#fff', fontFamily: 'Pixelify-Sans' }).setDepth(10002);
+        this.apText = this.add.bitmapText(20, this.scale.height - 60, 'editundo_23', '', 55).setDepth(10002).setScale(25 / 55).setTint(0x000000);
 
         this.gameScene.events.on('player_turn_started', (player) => this.showActions(player), this);
         this.gameScene.events.on('player_unit_selected', (unit) => this.showActions(unit), this);
@@ -79,12 +79,11 @@ export class ActionUI extends Phaser.Scene {
         }
 
         const padding = 24;
-        const text = this.add.text(padding, padding, content, {
-            fontSize: '28px',
-            fill: '#000',
-            wordWrap: { width: 300 },
-            fontFamily: 'Pixelify-Sans'
-        });
+        const text = this.add.bitmapText(padding, padding, 'editundo_18', content, 18);
+        text.setLetterSpacing(2);
+        text.setMaxWidth(300);
+
+        text.setTint(0x000000);
     
         const tooltipWidth = text.width + padding * 2;
         const tooltipHeight = text.height + padding * 2;
@@ -125,24 +124,21 @@ export class ActionUI extends Phaser.Scene {
         }
     
         const background = this.add.image(0, 0, 'bg_character_info').setOrigin(0,0);
-        background.setScale(2.5);
+        background.setScale(1.5);
         const tooltipWidth = background.displayWidth;
         const tooltipHeight = background.displayHeight;
 
-        const padding = 50;
-        const text = this.add.text(padding, 0, content, {
-            fontSize: '35px',
-            fill: '#000',
-            wordWrap: { width: tooltipWidth - (padding * 2) }, // Adjusted to fit image width
-            fontFamily: 'Pixelify-Sans',
-            lineSpacing: 2
-        });
+        const padding = 20;
+        const text = this.add.bitmapText(0, 0, 'editundo_18', content, 19); // Start at 0,0 within container
+        text.setMaxWidth(tooltipWidth - (padding * 2));
+
+        text.setLineSpacing(2);
+        text.setOrigin(0.5); // Set origin to center for easier positioning
+        text.setTint(0x000000);
     
-        // Recalculate text height based on new word wrap
-        text.updateText();
-        // Ensure text is centered horizontally if it's narrower than the allowed width
-        text.x = (tooltipWidth - text.width) / 2;
-        text.y = (tooltipHeight - text.height) / 2;
+        // Position text at the center of the background image, accounting for padding
+        text.x = tooltipWidth / 2;
+        text.y = tooltipHeight / 2;
 
 
         // Fullscreen semi-transparent blocker
@@ -165,8 +161,8 @@ export class ActionUI extends Phaser.Scene {
     createActionBar() {
         const slotCount = 6;
         const bgScale = 5;
-        const slotSize = 16 * bgScale; // ability_bg is 16x16
-        const spacing = 30;
+        const slotSize = 10 * bgScale; // ability_bg is 16x16
+        const spacing = 5;
 
         const totalWidth = slotCount * slotSize + (slotCount - 1) * spacing;
         const startX = (this.scale.width - totalWidth) / 2;
@@ -183,22 +179,20 @@ export class ActionUI extends Phaser.Scene {
 
     createButtons() {
         const buttonPadding = { x: 40, y: 20 }; // Internal padding for the button's content
-        const textStyle = {
-            fontSize: '36px',
-            fill: '#fff',
-            fontFamily: 'Pixelify-Sans',
-            align: 'center'
-        };
+
+        const buttonYPosition = this.scale.height - 16 * 6 - 10 + 30; // Moved lower
 
         // --- Skip Turn Button ---
-        const skipTurnText = this.add.text(0, 0, 'End Turn', textStyle).setOrigin(0.5);
-        const skipTurnButtonWidth = skipTurnText.width + buttonPadding.x;
-        const skipTurnButtonHeight = skipTurnText.height + buttonPadding.y;
-        const skipTurnBackground = this.add.nineslice(
-            0, 0, 'basic_button', 0, skipTurnButtonWidth, skipTurnButtonHeight, 8, 8, 8, 8
-        ).setOrigin(0.5);
+        const skipTurnText = this.add.bitmapText(0, 0, 'editundo_23', 'End Turn', 23).setOrigin(0.5);
+
+        const skipTurnButtonWidth = skipTurnText.width * (36/55) + buttonPadding.x;
+        const skipTurnButtonHeight = skipTurnText.height * (36/55) + buttonPadding.y;
+        const skipTurnBackground = this.add.image(0, 0, 'button_background').setOrigin(0.5);
+        skipTurnBackground.displayWidth = skipTurnButtonWidth;
+        skipTurnBackground.displayHeight = skipTurnButtonHeight;
+        skipTurnBackground.setScale(0.3)
         
-        const skipTurnButtonInitialY = this.scale.height - 16 * 6 - 10 - 60;
+        const skipTurnButtonInitialY = buttonYPosition;
         this.skipTurnButton = this.add.container(
             this.scale.width - 200, skipTurnButtonInitialY,
             [skipTurnBackground, skipTurnText]
@@ -228,16 +222,17 @@ export class ActionUI extends Phaser.Scene {
         });
 
         // --- Cancel Action Button ---
-        const cancelActionText = this.add.text(0, 0, 'Cancel Action', textStyle).setOrigin(0.5);
-        const cancelActionButtonWidth = cancelActionText.width + buttonPadding.x;
-        const cancelActionButtonHeight = cancelActionText.height + buttonPadding.y;
-        const cancelActionBackground = this.add.nineslice(
-            0, 0, 'basic_button', 0, cancelActionButtonWidth, cancelActionButtonHeight, 8, 8, 8, 8
-        ).setOrigin(0.5);
+        const cancelActionText = this.add.bitmapText(0, 0, 'editundo_23', 'Cancel Action', 23).setOrigin(0.5);
+        const cancelActionButtonWidth = cancelActionText.width * (36/55) + buttonPadding.x;
+        const cancelActionButtonHeight = cancelActionText.height * (36/55) + buttonPadding.y;
+        const cancelActionBackground = this.add.image(0, 0, 'button_background').setOrigin(0.5);
 
-        const cancelActionButtonInitialY = this.scale.height - 16 * 6 - 10 - 60;
+        cancelActionBackground.displayWidth = cancelActionButtonWidth;
+        cancelActionBackground.displayHeight = cancelActionButtonHeight;
+        cancelActionBackground.setScale(0.4);
+        const cancelActionButtonInitialY = buttonYPosition; // Same as skip turn button
         this.cancelActionButton = this.add.container(
-            this.scale.width / 2, cancelActionButtonInitialY,
+            this.scale.width - 200, cancelActionButtonInitialY, // Same x-position as skip turn button
             [cancelActionBackground, cancelActionText]
         );
         this.cancelActionButton.setSize(cancelActionButtonWidth, cancelActionButtonHeight);
@@ -305,11 +300,14 @@ export class ActionUI extends Phaser.Scene {
         if ((move.type === 'attack' || move.type === 'arrow_attack') && unit.usedStandardAction) isEnabled = false;
         if (unit.stats.currentAp < move.cost) isEnabled = false;
 
-        const scale = 2; // Icons are 32x32, this makes them 64x64
+        const scale = 1; // Icons are 32x32, this makes them 64x64
         const icon = this.add.image(slot.x, slot.y, move.icon)
             .setDepth(10001)
             .setData('abilityKey', ability.key)
             .setScale(scale);
+
+        // Store the initial Y position
+        icon.setData('initialY', slot.y); // Use slot.y as the fixed position
 
         // Make icon interactive unconditionally for hover events
         icon.setInteractive({useHandCursor: true});
@@ -318,9 +316,10 @@ export class ActionUI extends Phaser.Scene {
         icon.on('pointerover', () => {
             this.tweens.add({
                 targets: icon,
-                y: '-=5', // Move up 5 pixels
+                y: icon.getData('initialY') - 5, // Move up 5 pixels from initial
                 duration: 100,
-                ease: 'Power1'
+                ease: 'Power1',
+                overwrite: true // Ensure previous tweens are stopped
             });
             const move = ability.moveData;
             let abilityText = `${move.name}\nCost: ${move.cost} AP\nRange: ${move.range}`;
@@ -345,9 +344,10 @@ export class ActionUI extends Phaser.Scene {
         icon.on('pointerout', () => {
             this.tweens.add({
                 targets: icon,
-                y: '+=5', // Move back down 5 pixels
+                y: icon.getData('initialY'), // Return to initial Y
                 duration: 100,
-                ease: 'Power1'
+                ease: 'Power1',
+                overwrite: true // Ensure previous tweens are stopped
             });
             this.hideTooltip();
         });
@@ -364,13 +364,7 @@ export class ActionUI extends Phaser.Scene {
         } else {
             icon.setTint(0x808080);
             if (move.currentCooldown > 0) {
-                const cooldownText = this.add.text(icon.x, icon.y, move.currentCooldown, {
-                    fontSize: '32px',
-                    fill: '#fff',
-                    stroke: '#000',
-                    strokeThickness: 4,
-                    fontFamily: 'Pixelify-Sans'
-                }).setOrigin(0.5, 0.5).setDepth(10002);
+                const cooldownText = this.add.bitmapText(icon.x, icon.y, 'editundo_23', move.currentCooldown.toString(), 55).setOrigin(0.5, 0.5).setDepth(10002).setScale(32/55).setTint(0x000000);
                 
                 if (!this.cooldownTexts) this.cooldownTexts = [];
                 this.cooldownTexts.push(cooldownText);

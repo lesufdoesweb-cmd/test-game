@@ -7,36 +7,20 @@ export class Options extends Phaser.Scene {
         const centreX = this.scale.width * 0.5;
         const centreY = this.scale.height * 0.5;
 
-        this.add.text(centreX, centreY - 200, 'Options', {
-            fontFamily: 'Pixelify-Sans', fontSize: 64, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5);
+        this.add.bitmapText(centreX, centreY - 200, 'editundo_55', 'Options', 55).setOrigin(0.5);
 
-        this.add.text(centreX, centreY - 50, 'Volume: 100%', {
-            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5);
+        this.add.bitmapText(centreX, centreY - 50, 'editundo_55', 'Volume: 100%', 55).setOrigin(0.5).setScale(42 / 55);
 
-        this.add.text(centreX, centreY + 50, 'Difficulty: Normal', {
-            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5);
+        this.add.bitmapText(centreX, centreY + 50, 'editundo_55', 'Difficulty: Normal', 55).setOrigin(0.5).setScale(42 / 55);
 
-        const backButton = this.add.text(centreX, centreY + 200, 'Back', {
-            fontFamily: 'Pixelify-Sans', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setInteractive();
+        const backButton = this.add.bitmapText(centreX, centreY + 200, 'editundo_55', 'Back', 55).setOrigin(0.5).setInteractive().setScale(42 / 55);
 
         backButton.on('pointerover', () => {
-            backButton.setStyle({ fill: '#ff0' });
+            backButton.setTint(0xffff00);
         });
 
         backButton.on('pointerout', () => {
-            backButton.setStyle({ fill: '#fff' });
+            backButton.clearTint();
         });
 
         backButton.on('pointerdown', () => {

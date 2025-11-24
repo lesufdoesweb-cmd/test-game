@@ -7,13 +7,13 @@ export class MainMenu extends Phaser.Scene {
         const { width } = this.scale;
 
         const container = this.add.container(width / 2, y);
+        container.setScale(0.4)
         const background = this.add.image(0, 0, 'button_background');
         background.setScale(0.8)
-        const label = this.add.text(0, -10, text, {
-            fontSize: '55px',
-            fill: '#ffffff',
-            fontFamily: 'Pixelify-Sans'
-        }).setOrigin(0.5);
+
+        const label = this.add.bitmapText(0, 0, 'editundo_55', text, 55);
+        label.setLetterSpacing(2);
+        label.setOrigin(0.5);
 
         container.add([background, label]);
         container.setSize(background.width, background.height);
@@ -54,7 +54,7 @@ export class MainMenu extends Phaser.Scene {
             bgImage.setScale(scale);
     
             const titleImage = this.add.image(width / 2, height / 4, 'title_main_screen');
-            titleImage.setScale(1.5);
+            titleImage.setScale(0.8);
 
             this.tweens.add({
                 targets: titleImage,

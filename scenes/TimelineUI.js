@@ -19,20 +19,20 @@ export class TimelineUI extends Phaser.Scene {
     }
 
     createPortraits() {
-        const startY = 100;
-        const stepY = 120;
+        const startY = 50;
+        const stepY = 55;
         const displayCount = 8;
-        const bgScale = 0.8;
+        const bgScale = 0.4;
 
         for (let i = 0; i < displayCount; i++) {
             const y = startY + i * stepY;
-            const x = 70;
+            const x = 50;
             const portraitBg = this.add.image(x, y, ASSETS.image.timeline_bg.key)
                 .setScale(bgScale);
 
             // Use a placeholder texture that exists
             const portrait = this.add.sprite(x, y, ASSETS.image.archer.key);
-            portrait.setScale(2);
+            portrait.setScale(1);
             portrait.setVisible(false); // Hide until updated with actual unit data
 
             this.portraits.push({ bg: portraitBg, sprite: portrait });

@@ -110,6 +110,10 @@ export default {
             key: 'basic_button',
             args: ['src/assets/user_interface/basic_button.png']
         },
+        start_button: {
+            key: 'start_button',
+            args: ['src/assets/user_interface/start_button_2.png']
+        },
         bg_fights: {
             key: 'bg_fights',
             args: ['src/assets/backgrounds/bg_fights.png']

@@ -6,7 +6,26 @@ export class Preloader extends Phaser.Scene {
     }
 
     preload() {
-        this.load.font('Pixelify-Sans', 'src/assets/fonts/Jersey10-Regular.ttf', 'truetype')
+        this.load.font('Pixelify-Sans', 'src/assets/fonts/editundo.ttf', 'truetype')
+
+        this.load.bitmapFont('Pixelify-Sans', 'src/assets/fonts/editundo.ttf', 'truetype');
+        this.load.bitmapFont(
+            'editundo_55',
+            'src/assets/fonts/editundo.png',
+            'src/assets/fonts/editundo.xml'
+        );
+
+        this.load.bitmapFont(
+            'editundo_23',
+            'src/assets/fonts/Unnamed.png',
+            'src/assets/fonts/Unnamed.xml'
+        );
+
+        this.load.bitmapFont(
+            'editundo_18',
+            'src/assets/fonts/Unnamed_18.png',
+            'src/assets/fonts/Unnamed_18.xml'
+        );
         // Add a loading bar
         const { width, height } = this.scale;
         const progressBar = this.add.graphics();
