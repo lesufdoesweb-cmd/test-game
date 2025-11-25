@@ -147,6 +147,10 @@ export class Game extends Phaser.Scene {
                         const tileWidth = tile.displayWidth;
                         const tileHeight = tile.displayHeight;
 
+                        const randomFrequency = Phaser.Math.Between(1500, 3000);
+
+                        const randomDelay = Math.random() * 2000;
+
                         const emitter = this.add.particles(screenX, screenY, 'pixel', {
                             emitZone: { source: new Phaser.Geom.Rectangle(-tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight) },
                             lifespan: { min: 2000, max: 4000 },
@@ -156,11 +160,12 @@ export class Game extends Phaser.Scene {
                             alpha: { start: 0.6, end: 0 },
                             tint: 0x90EE90,
                             quantity: 1,
-                            frequency: 300,
+                            delay: randomDelay,
+                            frequency: randomFrequency,
                             blendMode: 'ADD'
                         });
                         emitter.setDepth(99999);
-                        emitter.postFX.addGlow(0x90EE90, 1, 0, false, 0.1, 10);
+                      //  emitter.postFX.addGlow(0x90EE90, 1, 0, false, 0.1, 10);
                     }
                     tile.setInteractive({ pixelPerfect: true }); // Use pixel perfect if you have transparency
 
@@ -738,36 +743,47 @@ export class Game extends Phaser.Scene {
         const duration = 200 * (path.length - 1);
         const follower = { t: 0, vec: new Phaser.Math.Vector2() };
 
-        // --- NEW: Settings for the Hop ---
-        const hopHeight = 4; // How high (in pixels) they jump. Keep it small (6-10) for "subtle".
-        const totalSteps = path.length - 1; // How many hops we need
+        const hopHeight = 8; // Slight increase for better visual
+        const totalSteps = path.length - 1;
 
         this.tweens.add({
             targets: follower,
             t: 1,
             duration: duration,
-            ease: 'Linear', // Keep Linear so speed is constant
+            ease: 'Linear',
             onUpdate: () => {
                 // Get the ground position
                 movementPath.getPoint(follower.t, follower.vec);
 
-                // --- NEW: Calculate Hop Offset ---
+                // Calculate Hop
                 const hopY = Math.sin(follower.t * totalSteps * Math.PI) * hopHeight;
 
-                // Apply position: X is normal, Y is Ground Y - Hop Y (Minus because up is negative)
+                // 1. Move the UNIT (Apply Hop)
                 unit.sprite.setPosition(follower.vec.x, follower.vec.y - Math.abs(hopY));
 
-                // Flip logic for movement
-                if (unit.sprite.x < unit.sprite.getData('prevX')) { // Moving left
-                    unit.sprite.flipX = true;
-                } else if (unit.sprite.x > unit.sprite.getData('prevX')) { // Moving right
-                    unit.sprite.flipX = false;
-                }
-                unit.sprite.setData('prevX', unit.sprite.x); // Store current X for next frame
+                // 2. --- FIX: Move the SHADOW (Stay on Ground) ---
+                if (unit.shadow) {
+                    // Shadow follows the ground vector exactly (no hopY)
+                    unit.shadow.setPosition(follower.vec.x, follower.vec.y);
 
-                // OPTIONAL: Update depth based on GROUND Y, not HOP Y
-                // This prevents them from flickering behind trees while in the air
+                    // Optional: Shrink shadow slightly when high in the air
+                    const scaleMod = 1 - (Math.abs(hopY) / 40);
+                    unit.shadow.setScale(scaleMod, - 0.5 * scaleMod);
+                }
+
+                // Flip logic
+                if (unit.sprite.x < unit.sprite.getData('prevX')) {
+                    unit.sprite.flipX = true;
+                    if (unit.shadow) unit.shadow.flipX = true; // Flip shadow too
+                } else if (unit.sprite.x > unit.sprite.getData('prevX')) {
+                    unit.sprite.flipX = false;
+                    if (unit.shadow) unit.shadow.flipX = false;
+                }
+                unit.sprite.setData('prevX', unit.sprite.x);
+
+                // Update depth based on GROUND Y
                 unit.sprite.setDepth(follower.vec.y);
+                if (unit.shadow) unit.shadow.setDepth(follower.vec.y - 0.1);
             },
             onComplete: () => {
                 const lastPos = path[path.length - 1];
@@ -775,7 +791,6 @@ export class Game extends Phaser.Scene {
                 unit.gridPos.y = lastPos.y;
                 this.isMoving = false;
 
-                // Clear the prevX data after movement completes
                 unit.sprite.setData('prevX', undefined);
 
                 if (this.activeUnitTween && this.activePlayerUnit === unit) {
@@ -788,6 +803,12 @@ export class Game extends Phaser.Scene {
                 unit.sprite.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
                 unit.sprite.setData('originalY', newOriginalY);
 
+                // Snap shadow to final position
+                if (unit.shadow) {
+                    unit.shadow.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
+                    unit.shadow.setScale(1, - 0.5); // Reset scale
+                }
+
                 // Update the selected unit indicator
                 if (this.selectedUnitIndicator && this.activePlayerUnit === unit) {
                     this.selectedUnitIndicator.destroy();
@@ -795,8 +816,7 @@ export class Game extends Phaser.Scene {
                     const screenY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
                     this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff);
                     this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25);
-                    
-                    // --- NEW: Add bobbing tween to new selected unit indicator ---
+
                     this.tweens.add({
                         targets: this.selectedUnitIndicator,
                         y: this.selectedUnitIndicator.y - 3,
