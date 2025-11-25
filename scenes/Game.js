@@ -162,6 +162,33 @@ export class Game extends Phaser.Scene {
                         emitter.setDepth(99999);
                         emitter.postFX.addGlow(0x90EE90, 1, 0, false, 0.1, 10);
                     }
+                    tile.setInteractive({ pixelPerfect: true }); // Use pixel perfect if you have transparency
+
+                    tile.on('pointerover', () => {
+                        // Brighten the tile
+                        tile.setTint(0xffffff);
+
+                        // Optional: Slight physical lift
+                        this.tweens.add({
+                            targets: tile,
+                            y: screenY - 2, // Lift up 4 pixels
+                            duration: 100,
+                            ease: 'Sine.easeOut'
+                        });
+                    });
+
+                    tile.on('pointerout', () => {
+                        // Return to the random tint we assigned in Step 1
+                        tile.setTint(tile.getData('originalTint'));
+
+                        // Return to ground
+                        this.tweens.add({
+                            targets: tile,
+                            y: screenY,
+                            duration: 100,
+                            ease: 'Sine.easeIn'
+                        });
+                    });
                 }
             }
         }
@@ -464,9 +491,22 @@ export class Game extends Phaser.Scene {
         move.currentCooldown = move.cooldown;
         this.activePlayerUnit.usedStandardAction = true;
 
+        const playerUnit = this.activePlayerUnit;
+        const targetSpriteX = targetUnit.sprite.x;
+
+        // Determine initial flip for attack
+        if (targetSpriteX < playerUnit.sprite.x) { // Target is to the left
+            playerUnit.sprite.flipX = true;
+        } else { // Target is to the right
+            playerUnit.sprite.flipX = false;
+        }
+
         const onHit = () => {
-            const damageInfo = this.activePlayerUnit.calculateDamage(targetUnit);
-            targetUnit.takeDamage(damageInfo, this.activePlayerUnit, move);
+            // Reset flipX after attack animation (assuming default is facing right)
+            playerUnit.sprite.flipX = false; 
+            
+            const damageInfo = playerUnit.calculateDamage(targetUnit);
+            targetUnit.takeDamage(damageInfo, playerUnit, move);
             this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
@@ -475,15 +515,15 @@ export class Game extends Phaser.Scene {
         if (move.type === 'arrow_attack') {
             const projectile = new Projectile(
                 this,
-                this.activePlayerUnit.sprite.x,
-                this.activePlayerUnit.sprite.y - 24, // Start from near the unit's head
+                playerUnit.sprite.x, // Use playerUnit.sprite.x
+                playerUnit.sprite.y - 24, // Start from near the unit's head
                 ASSETS.image.arrow_projectile.key,
                 targetUnit.sprite,
                 onHit
             );
             projectile.setDepth(9999);
         } else {
-            this.activePlayerUnit.attack(targetUnit, onHit);
+            playerUnit.attack(targetUnit, onHit);
         }
     }
     update(time, delta) {
@@ -681,6 +721,9 @@ export class Game extends Phaser.Scene {
             this.events.emit('player_action_selected');
         }
 
+        // Store initial x position for flip comparison
+        unit.sprite.setData('prevX', unit.sprite.x);
+
         // 1. Setup the Linear Ground Path
         const screenPath = path.map(pos => ({
             x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
@@ -709,13 +752,18 @@ export class Game extends Phaser.Scene {
                 movementPath.getPoint(follower.t, follower.vec);
 
                 // --- NEW: Calculate Hop Offset ---
-                // We map 't' (0 to 1) to the total number of PI cycles needed.
-                // Math.sin(0) is 0, Math.sin(PI) is 0. We need 0 -> PI for every step.
                 const hopY = Math.sin(follower.t * totalSteps * Math.PI) * hopHeight;
 
                 // Apply position: X is normal, Y is Ground Y - Hop Y (Minus because up is negative)
-                // We use Math.abs just to ensure it never goes below ground due to floating point math
                 unit.sprite.setPosition(follower.vec.x, follower.vec.y - Math.abs(hopY));
+
+                // Flip logic for movement
+                if (unit.sprite.x < unit.sprite.getData('prevX')) { // Moving left
+                    unit.sprite.flipX = true;
+                } else if (unit.sprite.x > unit.sprite.getData('prevX')) { // Moving right
+                    unit.sprite.flipX = false;
+                }
+                unit.sprite.setData('prevX', unit.sprite.x); // Store current X for next frame
 
                 // OPTIONAL: Update depth based on GROUND Y, not HOP Y
                 // This prevents them from flickering behind trees while in the air
@@ -726,6 +774,9 @@ export class Game extends Phaser.Scene {
                 unit.gridPos.x = lastPos.x;
                 unit.gridPos.y = lastPos.y;
                 this.isMoving = false;
+
+                // Clear the prevX data after movement completes
+                unit.sprite.setData('prevX', undefined);
 
                 if (this.activeUnitTween && this.activePlayerUnit === unit) {
                     this.activeUnitTween.stop();
@@ -1093,6 +1144,9 @@ export class Game extends Phaser.Scene {
             }
 
             enemy.attack(closestPlayerUnit, () => {
+                // Reset flipX after attack animation
+                enemy.sprite.flipX = false; // Assuming default is facing right
+                
                 const damageInfo = enemy.calculateDamage(closestPlayerUnit);
                 closestPlayerUnit.takeDamage(damageInfo, enemy, attackMove);
                 if (callback) {
