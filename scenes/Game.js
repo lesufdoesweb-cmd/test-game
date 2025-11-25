@@ -44,9 +44,17 @@ export class Game extends Phaser.Scene {
         this.lastCameraY = 0;
         this.lastPointerX = 0;
         this.lastPointerY = 0;
+
+        // --- RESTORED: Animation Arrays ---
+        this.animTiles = [];
+        this.animObjects = [];
     }
 
     create(data) {
+        // Clear previous animation arrays
+        this.animTiles = [];
+        this.animObjects = [];
+
         const battleMap = data.battleMap || testMap;
         const enemyArmy = data.enemyArmy || testArmy;
         const playerArmy = data.playerArmy || defaultArmy;
@@ -126,6 +134,13 @@ export class Game extends Phaser.Scene {
             }
         });
 
+        // --- Generate Particle Texture ONCE to avoid feedback loops ---
+        if (!this.textures.exists('particle')) {
+            const particleG = this.make.graphics({ x: 0, y: 0, add: false });
+            particleG.fillStyle(0xffffff);
+            particleG.fillRect(0, 0, 1, 1);
+            particleG.generateTexture('particle', 1, 1);
+        }
 
         // --- Map Rendering & Forest Particles ---
         for (let gridY = 0; gridY < this.mapConsts.MAP_SIZE_Y; gridY++) {
@@ -142,16 +157,23 @@ export class Game extends Phaser.Scene {
                     tile.setOrigin(0.5, 0.375);
                     tile.setDepth(gridX + gridY);
 
+                    // --- RESTORED: Setup Tile Animation Data ---
+                    tile.setData('finalY', screenY);
+                    tile.setData('gridSum', gridX + gridY); // For diagonal wave
+                    tile.y += 300; // Start underground
+                    tile.alpha = 0; // Start invisible
+                    this.animTiles.push(tile);
+
                     // Check for forest tile type and add particles randomly
                     if (tileInfo.assetKey.startsWith('base_') && Math.random() < 0.3) {
                         const tileWidth = tile.displayWidth;
                         const tileHeight = tile.displayHeight;
 
+                        // Randomized timing so they don't sync up
                         const randomFrequency = Phaser.Math.Between(1500, 3000);
-
                         const randomDelay = Math.random() * 2000;
 
-                        const emitter = this.add.particles(screenX, screenY, 'pixel', {
+                        const emitter = this.add.particles(screenX, screenY, 'particle', {
                             emitZone: { source: new Phaser.Geom.Rectangle(-tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight) },
                             lifespan: { min: 2000, max: 4000 },
                             speedY: { min: -5, max: -10 },
@@ -165,31 +187,24 @@ export class Game extends Phaser.Scene {
                             blendMode: 'ADD'
                         });
                         emitter.setDepth(99999);
-                      //  emitter.postFX.addGlow(0x90EE90, 1, 0, false, 0.1, 10);
                     }
                     tile.setInteractive({ pixelPerfect: true }); // Use pixel perfect if you have transparency
 
                     tile.on('pointerover', () => {
-                        // Brighten the tile
                         tile.setTint(0xffffff);
-
-                        // Optional: Slight physical lift
                         this.tweens.add({
                             targets: tile,
-                            y: screenY - 2, // Lift up 4 pixels
+                            y: tile.getData('finalY') - 2, // Use finalY to respect anim
                             duration: 100,
                             ease: 'Sine.easeOut'
                         });
                     });
 
                     tile.on('pointerout', () => {
-                        // Return to the random tint we assigned in Step 1
                         tile.setTint(tile.getData('originalTint'));
-
-                        // Return to ground
                         this.tweens.add({
                             targets: tile,
-                            y: screenY,
+                            y: tile.getData('finalY'),
                             duration: 100,
                             ease: 'Sine.easeIn'
                         });
@@ -203,6 +218,9 @@ export class Game extends Phaser.Scene {
             const screenX = this.origin.x + (obj.position.x - obj.position.y) * this.mapConsts.HALF_WIDTH;
             const screenY = this.origin.y + (obj.position.x + obj.position.y) * this.mapConsts.QUARTER_HEIGHT;
 
+            let createdObject = null;
+            let shadowObject = null; // Track shadow if unit
+
             switch (obj.type) {
                 case 'unit':
                     const unitType = UNIT_TYPES[obj.unitType];
@@ -212,7 +230,6 @@ export class Game extends Phaser.Scene {
                         const moves = unitType.moves.map(abilityKey => {
                             const abilityTemplate = ABILITIES[abilityKey];
                             const move = { ...abilityTemplate };
-                            // Special handling for MOVE ability to set range from unit stats
                             if (move.type === 'move') {
                                 move.range = stats.moveRange;
                             }
@@ -234,6 +251,14 @@ export class Game extends Phaser.Scene {
                             this.playerUnits.push(unit);
                         }
                         this.makeUnitInteractive(unit);
+
+                        createdObject = unit.sprite;
+                        unit.sprite.setData('originalY', screenY);
+
+                        // Grab shadow if it exists so we can animate it too
+                        if (unit.shadow) {
+                            shadowObject = unit.shadow;
+                        }
                     }
                     break;
                 case 'scenery':
@@ -245,9 +270,10 @@ export class Game extends Phaser.Scene {
                         gridPos: obj.position
                     });
                     this.sceneryObjects.push(scenery);
+                    createdObject = scenery.sprite;
                     break;
                 case 'chest':
-                    new Chest(this, {
+                    const chest = new Chest(this, {
                         x: screenX,
                         y: screenY,
                         texture: ASSETS.spritesheet.items.key,
@@ -255,9 +281,10 @@ export class Game extends Phaser.Scene {
                         depth: screenY,
                         items: obj.items
                     });
+                    createdObject = chest.sprite;
                     break;
                 case 'npc':
-                    new NPC(this, {
+                    const npc = new NPC(this, {
                         x: screenX,
                         y: screenY,
                         texture: ASSETS.spritesheet.npc.key,
@@ -265,7 +292,24 @@ export class Game extends Phaser.Scene {
                         depth: screenY,
                         npcType: obj.npcType
                     });
+                    createdObject = npc.sprite;
                     break;
+            }
+
+            // --- RESTORED: Setup Object Animation Data ---
+            if (createdObject) {
+                createdObject.setData('finalY', screenY);
+                createdObject.y -= 300; // Start in the sky
+                createdObject.alpha = 0; // Start invisible
+                this.animObjects.push(createdObject);
+
+                // If there's a shadow, it also needs to start in the sky
+                if (shadowObject) {
+                    shadowObject.setData('finalY', screenY);
+                    shadowObject.y -= 300;
+                    shadowObject.alpha = 0;
+                    this.animObjects.push(shadowObject);
+                }
             }
         });
 
@@ -304,19 +348,20 @@ export class Game extends Phaser.Scene {
             mapWorldHeight + padding * 2
         );
 
-        this.cameras.main.centerOn(this.playerUnits[0].sprite.x, this.playerUnits[0].sprite.y);
+        // --- RESTORED: Center Camera on the MAP CENTER ---
+        // We do this because units are in the sky, so centering on them would look wrong
+        const midGridX = (this.mapConsts.MAP_SIZE_X - 1) / 2;
+        const midGridY = (this.mapConsts.MAP_SIZE_Y - 1) / 2;
+        const mapCenterX = this.origin.x + (midGridX - midGridY) * this.mapConsts.HALF_WIDTH;
+        const mapCenterY = this.origin.y + (midGridX + midGridY) * this.mapConsts.QUARTER_HEIGHT;
+        this.cameras.main.centerOn(mapCenterX, mapCenterY);
+
 
         // --- Start Game ---
         this.buildTurnOrder();
         this.scene.launch('TimelineUI', {turnOrder: this.turnOrder});
         this.scene.launch('ActionUI');
         this.scene.launch('PlayerStatsUI');
-
-        // Delay the start of the first turn by a tiny amount
-        // to ensure all UI scenes have time to set up their event listeners.
-        this.time.delayedCall(1, () => {
-            this.startNextTurn();
-        });
 
         // --- Event Listeners ---
         this.events.on('unit_stats_changed', (unit) => {
@@ -328,13 +373,6 @@ export class Game extends Phaser.Scene {
         this.events.on('unit_died', this.onUnitDied, this);
         this.events.on('action_cancelled', this.cancelPlayerAction, this);
         this.events.on('skip_turn', this.endFullPlayerTurn, this);
-
-        // --- Particle Effects ---
-        const particleG = this.add.graphics();
-        particleG.fillStyle(0xffffff);
-        particleG.fillRect(0, 0, 1, 1);
-        particleG.generateTexture('particle', 1, 1);
-        particleG.destroy();
 
 
         this.events.on('unit_damaged', (x, y, attacker, target) => {
@@ -359,7 +397,6 @@ export class Game extends Phaser.Scene {
             }
 
             // Create a ONE-SHOT emitter at the hit location with the chosen angle range.
-            // Note: in Phaser >= 3.60 the call signature is this.add.particles(x, y, key, config)
             const emitter = this.add.particles(x, y, 'particle', {
                 angle: angleCfg,
                 speed: {min: 150, max: 300},
@@ -392,7 +429,7 @@ export class Game extends Phaser.Scene {
 
         this.input.on('pointerdown', (pointer) => {
             if (this.gameState !== 'PLAYER_TURN' || this.isMoving) return;
-        
+
             if (pointer.middleButtonDown()) {
                 this.isMiddleButtonDown = true;
                 this.lastCameraX = this.cameras.main.scrollX;
@@ -405,31 +442,31 @@ export class Game extends Phaser.Scene {
                 this.cancelPlayerAction();
                 return;
             }
-        
+
             if (pointer.leftButtonDown()) {
                 const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
-        
+
                 if (gridPos.x < 0 || gridPos.x >= this.mapConsts.MAP_SIZE_X || gridPos.y < 0 || gridPos.y >= this.mapConsts.MAP_SIZE_Y) {
                     return; // Click outside map bounds
                 }
-        
+
                 // Check if the tile is a valid action tile for the current state
                 const isTileValid = this.validActionTiles.some(tile => tile.x === gridPos.x && tile.y === gridPos.y);
                 if (!isTileValid) {
                     return; // Clicked on an invalid tile for the current action
                 }
-        
+
                 // --- Handle action based on state ---
                 if (this.playerActionState === 'move') {
                     this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
-        
+
                 } else if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
                     const targetUnit = this.getUnitAtGridPos(gridPos);
                     if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0xff0000) { // Check tint, which confirms it's a valid highlighted target
                         this.performPlayerAttack(targetUnit);
                     }
-        
+
                 } else if (this.playerActionState === 'enhance_armor') {
                     const targetUnit = this.getUnitAtGridPos(gridPos);
                     if (targetUnit && targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0x00ff00) { // Check tint
@@ -470,23 +507,78 @@ export class Game extends Phaser.Scene {
         this.input.mouse.disableContextMenu();
 
         this.cameras.main.postFX.addVignette(0.5, 0.5, 0.98, 0.4);
+
+        // --- RESTORED: Trigger Entrance Animation ---
+        this.animateSceneEntry();
+    }
+
+    // --- RESTORED: Scene Entry Animation Function ---
+    animateSceneEntry() {
+        const waveSpeed = 60; // How fast the wave propagates
+
+        // 1. Animate Tiles (from Bottom)
+        // We find the max delay to know when tiles are finished
+        let maxTileDelay = 0;
+
+        this.animTiles.forEach(tile => {
+            const delay = tile.getData('gridSum') * waveSpeed;
+            if (delay > maxTileDelay) maxTileDelay = delay;
+
+            this.tweens.add({
+                targets: tile,
+                y: tile.getData('finalY'),
+                alpha: 1,
+                duration: 600,
+                delay: delay,
+                ease: 'Back.easeOut'
+            });
+        });
+
+        // 2. Animate Objects (from Top) - Starts after tiles finish
+        // We give a small buffer (maxTileDelay + 200ms) before objects drop
+        this.time.delayedCall(maxTileDelay + 200, () => {
+
+            this.animObjects.forEach((obj, index) => {
+                const randomDelay = Math.random() * 300;
+
+                this.tweens.add({
+                    targets: obj,
+                    y: obj.getData('finalY'),
+                    alpha: 1,
+                    duration: 800,
+                    delay: randomDelay,
+                    ease: 'Bounce.easeOut', // Bounce when hitting ground
+                    onComplete: () => {
+                        // Ensure units have originalY set correctly after animation
+                        // This prevents logic errors if originalY was temporarily overwritten
+                        obj.setData('originalY', obj.y);
+                    }
+                });
+            });
+
+            // 3. Start the game logic only after animations complete
+            // Wait for the object drop animation (800ms + max random delay 300ms)
+            this.time.delayedCall(1200, () => {
+                this.startNextTurn();
+            });
+        });
     }
 
     performEnhanceArmor(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
-    
+
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
-    
+
         targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration, amount: move.amount });
-        
+
         this.clearHighlights();
         this.playerActionState = 'SELECTING_ACTION';
         this.events.emit('player_action_completed');
     }
-    
+
     performPlayerAttack(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
@@ -508,8 +600,8 @@ export class Game extends Phaser.Scene {
 
         const onHit = () => {
             // Reset flipX after attack animation (assuming default is facing right)
-            playerUnit.sprite.flipX = false; 
-            
+            playerUnit.sprite.flipX = false;
+
             const damageInfo = playerUnit.calculateDamage(targetUnit);
             targetUnit.takeDamage(damageInfo, playerUnit, move);
             this.clearHighlights();
@@ -761,20 +853,18 @@ export class Game extends Phaser.Scene {
                 // 1. Move the UNIT (Apply Hop)
                 unit.sprite.setPosition(follower.vec.x, follower.vec.y - Math.abs(hopY));
 
-                // 2. --- FIX: Move the SHADOW (Stay on Ground) ---
+                // 2. Move the SHADOW (Stay on Ground)
                 if (unit.shadow) {
-                    // Shadow follows the ground vector exactly (no hopY)
                     unit.shadow.setPosition(follower.vec.x, follower.vec.y);
-
-                    // Optional: Shrink shadow slightly when high in the air
+                    // Shrink shadow slightly when high in the air
                     const scaleMod = 1 - (Math.abs(hopY) / 40);
-                    unit.shadow.setScale(scaleMod, - 0.5 * scaleMod);
+                    unit.shadow.setScale(scaleMod, -0.5 * scaleMod);
                 }
 
                 // Flip logic
                 if (unit.sprite.x < unit.sprite.getData('prevX')) {
                     unit.sprite.flipX = true;
-                    if (unit.shadow) unit.shadow.flipX = true; // Flip shadow too
+                    if (unit.shadow) unit.shadow.flipX = true;
                 } else if (unit.sprite.x > unit.sprite.getData('prevX')) {
                     unit.sprite.flipX = false;
                     if (unit.shadow) unit.shadow.flipX = false;
@@ -806,7 +896,7 @@ export class Game extends Phaser.Scene {
                 // Snap shadow to final position
                 if (unit.shadow) {
                     unit.shadow.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
-                    unit.shadow.setScale(1, - 0.5); // Reset scale
+                    unit.shadow.setScale(1, -0.5); // Reset scale
                 }
 
                 // Update the selected unit indicator
@@ -919,7 +1009,7 @@ export class Game extends Phaser.Scene {
         const screenY = this.origin.y + (unit.gridPos.x + unit.gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
         this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff); // Blue color
         this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25); // Ensure it's *below* the unit, but above the tile
-        
+
         // --- Add bobbing tween to selected unit indicator ---
         this.tweens.add({
             targets: this.selectedUnitIndicator,
@@ -956,7 +1046,7 @@ export class Game extends Phaser.Scene {
         if (this.activeUnitTween) {
             this.activeUnitTween.stop();
             if (this.activePlayerUnit && this.activePlayerUnit.sprite) {
-                 this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
+                this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
             }
         }
         this.activePlayerUnit = null;
@@ -1013,7 +1103,7 @@ export class Game extends Phaser.Scene {
 
     highlightRange(startPos, range, color) {
         this.clearHighlights();
-        
+
         // Add the starting tile itself as a valid action tile and highlight it
         this.validActionTiles.push(startPos);
         const startScreenX = this.origin.x + (startPos.x - startPos.y) * this.mapConsts.HALF_WIDTH + 2;
@@ -1166,7 +1256,7 @@ export class Game extends Phaser.Scene {
             enemy.attack(closestPlayerUnit, () => {
                 // Reset flipX after attack animation
                 enemy.sprite.flipX = false; // Assuming default is facing right
-                
+
                 const damageInfo = enemy.calculateDamage(closestPlayerUnit);
                 closestPlayerUnit.takeDamage(damageInfo, enemy, attackMove);
                 if (callback) {
@@ -1270,19 +1360,19 @@ export class Game extends Phaser.Scene {
         this.events.emit('turn_changed', this.turnIndex);
     }
 
-        makeUnitInteractive(unit) {
+    makeUnitInteractive(unit) {
         unit.sprite.setInteractive({ useHandCursor: true });
 
         // This listener handles clicks on this specific unit's sprite
         unit.sprite.on('pointerdown', (pointer) => {
             if (this.isMoving) return;
-    
+
             // Right-click for unit details is always available
             if (pointer.rightButtonDown()) {
                 pointer.event.stopPropagation();
                 const stats = unit.stats;
                 const effects = unit.statusEffects.map(e => `  - ${e.type.replace('_', ' ')} (${e.duration} turns left)`).join('\n') || '  - None';
-                const statsText = 
+                const statsText =
                     `Name: ${unit.name}
                     HP: ${stats.currentHealth} / ${stats.maxHealth}
                     AP: ${stats.currentAp} / ${stats.maxAp}
@@ -1306,10 +1396,10 @@ export class Game extends Phaser.Scene {
 
             // Left-click logic is only for player's turn
             if (this.gameState !== 'PLAYER_TURN') return;
-            
+
             // Stop the event from propagating to the main input handler (for tile clicks)
             pointer.event.stopPropagation();
-            
+
             // If no targeting action is active, this click is for selection.
             if (this.playerActionState === 'SELECTING_ACTION' && unit.isPlayer) {
                 this.activatePlayerUnit(unit);
@@ -1322,7 +1412,7 @@ export class Game extends Phaser.Scene {
             if (unit.isPlayer && this.activePlayerUnit !== unit) {
                 // Kill any existing tweens to prevent conflicts before starting the new one.
                 this.tweens.killTweensOf(unit.sprite);
-    
+
                 // Start the bobbing hover tween
                 this.tweens.add({
                     targets: unit.sprite,
@@ -1333,7 +1423,7 @@ export class Game extends Phaser.Scene {
                 });
             }
         });
-    
+
         unit.sprite.on('pointerout', () => {
             // Only reset hover effect if it's a player unit AND not the currently active one
             if (unit.isPlayer && this.activePlayerUnit !== unit) {
@@ -1343,4 +1433,5 @@ export class Game extends Phaser.Scene {
                 unit.sprite.setY(unit.sprite.getData('originalY'));
             }
         });
-    }}
+    }
+}
