@@ -156,10 +156,11 @@ export class Game extends Phaser.Scene {
                             alpha: { start: 0.6, end: 0 },
                             tint: 0x90EE90,
                             quantity: 1,
-                            frequency: 300, 
+                            frequency: 300,
                             blendMode: 'ADD'
                         });
                         emitter.setDepth(99999);
+                        emitter.postFX.addGlow(0x90EE90, 1, 0, false, 0.1, 10);
                     }
                 }
             }
@@ -436,24 +437,7 @@ export class Game extends Phaser.Scene {
         // Disable the browser's context menu on right-click
         this.input.mouse.disableContextMenu();
 
-        // --- Vignette ---
-        const vignetteTexture = this.textures.createCanvas('vignetteCanvas', width, height);
-        const canvas = vignetteTexture.canvas;
-        const context = vignetteTexture.context;
-
-        const outerRadius = Math.sqrt(width * width + height * height) / 2;
-        const innerRadius = width / 3;
-
-        const grd = context.createRadialGradient(width / 2, height / 2, innerRadius, width / 2, height / 2, outerRadius);
-        grd.addColorStop(0, 'rgba(0,0,0,0)');
-        grd.addColorStop(1, 'rgba(0,0,0,0.5)');
-
-        context.fillStyle = grd;
-        context.fillRect(0, 0, width, height);
-
-        vignetteTexture.refresh(); // Refresh the texture
-        const vignetteImage = this.add.image(width / 2, height / 2, 'vignetteCanvas');
-        vignetteImage.setDepth(10000).setScrollFactor(0);
+        this.cameras.main.postFX.addVignette(0.5, 0.5, 0.98, 0.4);
     }
 
     performEnhanceArmor(targetUnit) {
@@ -582,64 +566,75 @@ export class Game extends Phaser.Scene {
 
     createCornerIsometricIndicator(screenX, screenY, color = 0xffffff, alpha = 1) {
         const graphics = this.add.graphics();
-        graphics.lineStyle(1, color, alpha);
 
-        const size = this.mapConsts.TILE_WIDTH * 1;
-        const halfWidth = size / 2;
-        const quarterHeight = size / 4;
-        const cornerLengthFraction = 0.2;
+        // --- SETTINGS FOR SLEEK LOOK ---
+        const lineWidth = 2;       // Thinner lines (was 3)
+        const legLength = 0.15;    // Shorter legs (was 0.25)
+        const padding = 2;         // Push corners out by 2px for "breathing room"
 
-        const segHalfW = halfWidth * cornerLengthFraction;
-        const segQuarterH = quarterHeight * cornerLengthFraction;
+        // 1. Setup Dimensions
+        const width = this.mapConsts.TILE_WIDTH + (padding * 2);
+        const height = (this.mapConsts.TILE_WIDTH * 0.5) + (padding); // Maintain aspect ratio
 
-        const V1 = new Phaser.Math.Vector2(screenX, screenY - quarterHeight);
-        const V2 = new Phaser.Math.Vector2(screenX + halfWidth, screenY);
-        const V3 = new Phaser.Math.Vector2(screenX, screenY + quarterHeight);
-        const V4 = new Phaser.Math.Vector2(screenX - halfWidth, screenY);
+        graphics.lineStyle(lineWidth, color, alpha);
 
-        // Top corner (V1)
+        // 2. Calculate relative coordinates
+        const halfW = width / 2;
+        const halfH = height / 2;
+
+        // The 4 Points of the diamond
+        const top = { x: 0, y: -halfH };
+        const right = { x: halfW, y: 0 };
+        const bottom = { x: 0, y: halfH };
+        const left = { x: -halfW, y: 0 };
+
+        // Linear Interpolation Helper
+        const lerp = (p1, p2, t) => ({
+            x: p1.x + (p2.x - p1.x) * t,
+            y: p1.y + (p2.y - p1.y) * t
+        });
+
+        // --- DRAWING ---
+
+        // Top Bracket
+        const t_left = lerp(top, left, legLength);
+        const t_right = lerp(top, right, legLength);
         graphics.beginPath();
-        graphics.moveTo(V1.x, V1.y);
-        graphics.lineTo(V1.x + segHalfW, V1.y + segQuarterH);
+        graphics.moveTo(t_left.x, t_left.y);
+        graphics.lineTo(top.x, top.y);
+        graphics.lineTo(t_right.x, t_right.y);
         graphics.strokePath();
 
+        // Right Bracket
+        const r_top = lerp(right, top, legLength);
+        const r_btm = lerp(right, bottom, legLength);
         graphics.beginPath();
-        graphics.moveTo(V1.x, V1.y);
-        graphics.lineTo(V1.x - segHalfW, V1.y + segQuarterH);
+        graphics.moveTo(r_top.x, r_top.y);
+        graphics.lineTo(right.x, right.y);
+        graphics.lineTo(r_btm.x, r_btm.y);
         graphics.strokePath();
 
-        // Right corner (V2)
+        // Bottom Bracket
+        const b_right = lerp(bottom, right, legLength);
+        const b_left = lerp(bottom, left, legLength);
         graphics.beginPath();
-        graphics.moveTo(V2.x, V2.y);
-        graphics.lineTo(V2.x - segHalfW, V2.y - segQuarterH);
-        graphics.strokePath();
-        
-        graphics.beginPath();
-        graphics.moveTo(V2.x, V2.y);
-        graphics.lineTo(V2.x - segHalfW, V2.y + segQuarterH);
+        graphics.moveTo(b_right.x, b_right.y);
+        graphics.lineTo(bottom.x, bottom.y);
+        graphics.lineTo(b_left.x, b_left.y);
         graphics.strokePath();
 
-        // Bottom corner (V3)
+        // Left Bracket
+        const l_btm = lerp(left, bottom, legLength);
+        const l_top = lerp(left, top, legLength);
         graphics.beginPath();
-        graphics.moveTo(V3.x, V3.y);
-        graphics.lineTo(V3.x - segHalfW, V3.y - segQuarterH);
-        graphics.strokePath();
-        
-        graphics.beginPath();
-        graphics.moveTo(V3.x, V3.y);
-        graphics.lineTo(V3.x + segHalfW, V3.y - segQuarterH);
+        graphics.moveTo(l_btm.x, l_btm.y);
+        graphics.lineTo(left.x, left.y);
+        graphics.lineTo(l_top.x, l_top.y);
         graphics.strokePath();
 
-        // Left corner (V4)
-        graphics.beginPath();
-        graphics.moveTo(V4.x, V4.y);
-        graphics.lineTo(V4.x + segHalfW, V4.y - segQuarterH);
-        graphics.strokePath();
-
-        graphics.beginPath();
-        graphics.moveTo(V4.x, V4.y);
-        graphics.lineTo(V4.x + segHalfW, V4.y + segQuarterH);
-        graphics.strokePath();
+        // 3. Position and Depth
+        graphics.setPosition(screenX, screenY);
+        graphics.setDepth(100);
 
         return graphics;
     }
@@ -679,13 +674,14 @@ export class Game extends Phaser.Scene {
             return;
         }
 
-            this.isMoving = true;
-        
-            this.events.emit('unit_is_moving');
-        
-            if (unit.isPlayer) {            this.events.emit('player_action_selected');
+        this.isMoving = true;
+        this.events.emit('unit_is_moving');
+
+        if (unit.isPlayer) {
+            this.events.emit('player_action_selected');
         }
 
+        // 1. Setup the Linear Ground Path
         const screenPath = path.map(pos => ({
             x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
             y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT,
@@ -699,14 +695,31 @@ export class Game extends Phaser.Scene {
         const duration = 200 * (path.length - 1);
         const follower = { t: 0, vec: new Phaser.Math.Vector2() };
 
+        // --- NEW: Settings for the Hop ---
+        const hopHeight = 4; // How high (in pixels) they jump. Keep it small (6-10) for "subtle".
+        const totalSteps = path.length - 1; // How many hops we need
+
         this.tweens.add({
             targets: follower,
             t: 1,
             duration: duration,
-            ease: 'Linear',
+            ease: 'Linear', // Keep Linear so speed is constant
             onUpdate: () => {
+                // Get the ground position
                 movementPath.getPoint(follower.t, follower.vec);
-                unit.sprite.setPosition(follower.vec.x, follower.vec.y);
+
+                // --- NEW: Calculate Hop Offset ---
+                // We map 't' (0 to 1) to the total number of PI cycles needed.
+                // Math.sin(0) is 0, Math.sin(PI) is 0. We need 0 -> PI for every step.
+                const hopY = Math.sin(follower.t * totalSteps * Math.PI) * hopHeight;
+
+                // Apply position: X is normal, Y is Ground Y - Hop Y (Minus because up is negative)
+                // We use Math.abs just to ensure it never goes below ground due to floating point math
+                unit.sprite.setPosition(follower.vec.x, follower.vec.y - Math.abs(hopY));
+
+                // OPTIONAL: Update depth based on GROUND Y, not HOP Y
+                // This prevents them from flickering behind trees while in the air
+                unit.sprite.setDepth(follower.vec.y);
             },
             onComplete: () => {
                 const lastPos = path[path.length - 1];
@@ -714,24 +727,34 @@ export class Game extends Phaser.Scene {
                 unit.gridPos.y = lastPos.y;
                 this.isMoving = false;
 
-                // Stop any existing selection tween on this unit
                 if (this.activeUnitTween && this.activePlayerUnit === unit) {
                     this.activeUnitTween.stop();
                 }
 
-                // Update the 'originalY' for the new position
                 const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
-                unit.sprite.setY(newOriginalY); // Ensure it's exactly at the final spot.
+
+                // Ensure they land exactly on the ground
+                unit.sprite.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
                 unit.sprite.setData('originalY', newOriginalY);
 
-                // --- NEW: Update the selected unit indicator ---
+                // Update the selected unit indicator
                 if (this.selectedUnitIndicator && this.activePlayerUnit === unit) {
                     this.selectedUnitIndicator.destroy();
                     const screenX = this.origin.x + (lastPos.x - lastPos.y) * this.mapConsts.HALF_WIDTH;
                     const screenY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
-                    // Applying the user's manual offset here for consistency
                     this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff);
                     this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25);
+                    
+                    // --- NEW: Add bobbing tween to new selected unit indicator ---
+                    this.tweens.add({
+                        targets: this.selectedUnitIndicator,
+                        y: this.selectedUnitIndicator.y - 3,
+                        duration: 500,
+                        ease: 'Sine.easeInOut',
+                        yoyo: true,
+                        repeat: -1,
+                        repeatDelay: 0
+                    });
                 }
 
                 if (unit.isPlayer) {
@@ -794,7 +817,8 @@ export class Game extends Phaser.Scene {
             this.tweens.killTweensOf(this.activePlayerUnit.sprite);
             this.activePlayerUnit.sprite.setY(this.activePlayerUnit.sprite.getData('originalY'));
         }
-        if (this.selectedUnitIndicator) { // NEW: Destroy indicator
+        if (this.selectedUnitIndicator) {
+            this.tweens.killTweensOf(this.selectedUnitIndicator); // Kill indicator tweens
             this.selectedUnitIndicator.destroy();
             this.selectedUnitIndicator = null;
         }
@@ -824,6 +848,17 @@ export class Game extends Phaser.Scene {
         const screenY = this.origin.y + (unit.gridPos.x + unit.gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
         this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff); // Blue color
         this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25); // Ensure it's *below* the unit, but above the tile
+        
+        // --- Add bobbing tween to selected unit indicator ---
+        this.tweens.add({
+            targets: this.selectedUnitIndicator,
+            y: this.selectedUnitIndicator.y - 3, // Move up by 3 pixels
+            duration: 500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            repeatDelay: 0
+        });
     }
 
     startPlayerUnitTurn(unit) {
@@ -1217,11 +1252,10 @@ export class Game extends Phaser.Scene {
                 // Start the bobbing hover tween
                 this.tweens.add({
                     targets: unit.sprite,
-                    y: unit.sprite.getData('originalY') - 5, // Float up slightly
-                    duration: 500,
+                    y: unit.sprite.getData('originalY') - 3, // Float up slightly
+                    duration: 50,
                     ease: 'Sine.easeInOut',
-                    yoyo: true,
-                    repeat: -1
+                    yoyo: false,
                 });
             }
         });

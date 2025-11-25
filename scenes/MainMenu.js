@@ -7,9 +7,10 @@ export class MainMenu extends Phaser.Scene {
         const { width } = this.scale;
 
         const container = this.add.container(width / 2, y);
-        container.setScale(0.3)
+        container.setScale(0.3);
+
         const background = this.add.image(0, 0, 'button_background');
-        background.setScale(1)
+        background.setScale(1);
 
         const label = this.add.bitmapText(0, 0, 'editundo_55', text, 55);
         label.setLetterSpacing(2);
@@ -18,6 +19,11 @@ export class MainMenu extends Phaser.Scene {
         container.add([background, label]);
         container.setSize(background.width, background.height);
         container.setInteractive({ useHandCursor: true });
+
+        // --- UPDATED: Green Glow FX ---
+        // Color: 0x90EE90 (Matches your particles)
+        // Strength: 0 (Start invisible)
+        const glowFx = container.postFX.addGlow(0x90EE90, 0, 0, false, 0.1, 10);
 
         container.on('pointerdown', onClick);
 
@@ -28,12 +34,28 @@ export class MainMenu extends Phaser.Scene {
                 duration: 150,
                 ease: 'Sine.easeOut'
             });
+
+            // Fade glow IN
+            this.tweens.add({
+                targets: glowFx,
+                outerStrength: 1.5, // 4.0 is a good brightness for green
+                duration: 150,
+                ease: 'Sine.easeOut'
+            });
         });
 
         container.on('pointerout', () => {
             this.tweens.add({
                 targets: container,
                 y: y,
+                duration: 150,
+                ease: 'Sine.easeIn'
+            });
+
+            // Fade glow OUT
+            this.tweens.add({
+                targets: glowFx,
+                outerStrength: 0,
                 duration: 150,
                 ease: 'Sine.easeIn'
             });
