@@ -100,10 +100,11 @@ export class Game extends Phaser.Scene {
         // Add the combat background image
         const { width, height } = this.scale;
         const bgImage = this.add.image(width / 2, height / 2, 'bg_fights');
+
         const scaleX = width / bgImage.width;
         const scaleY = height / bgImage.height;
         const scale = Math.max(scaleX, scaleY);
-        bgImage.setScale(scale).setDepth(-1);
+        bgImage.setScale(scale).setDepth(-1).setScrollFactor(0);
 
         this.origin.x = this.scale.width / 2;
         this.origin.y = this.scale.height / 2 - 100;
@@ -126,7 +127,7 @@ export class Game extends Phaser.Scene {
         });
 
 
-        // --- Map Rendering ---
+        // --- Map Rendering & Forest Particles ---
         for (let gridY = 0; gridY < this.mapConsts.MAP_SIZE_Y; gridY++) {
             for (let gridX = 0; gridX < this.mapConsts.MAP_SIZE_X; gridX++) {
                 const tileType = this.grid[gridY][gridX];
@@ -140,9 +141,27 @@ export class Game extends Phaser.Scene {
                     const tile = this.add.image(screenX, screenY, tileInfo.assetKey);
                     tile.setOrigin(0.5, 0.375);
                     tile.setDepth(gridX + gridY);
+
+                    // Check for forest tile type and add particles randomly
+                    if (tileInfo.assetKey.startsWith('base_') && Math.random() < 0.3) {
+                        const tileWidth = tile.displayWidth;
+                        const tileHeight = tile.displayHeight;
+
+                        const emitter = this.add.particles(screenX, screenY, 'pixel', {
+                            emitZone: { source: new Phaser.Geom.Rectangle(-tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight) },
+                            lifespan: { min: 2000, max: 4000 },
+                            speedY: { min: -5, max: -10 },
+                            speedX: { min: -5, max: 5 },
+                            scale: { start: 1, end: 0 },
+                            alpha: { start: 0.6, end: 0 },
+                            tint: 0x90EE90,
+                            quantity: 1,
+                            frequency: 300, 
+                            blendMode: 'ADD'
+                        });
+                        emitter.setDepth(99999);
+                    }
                 }
-
-
             }
         }
 
@@ -228,6 +247,30 @@ export class Game extends Phaser.Scene {
         // --- Camera and Input ---
         this.cameras.main.setZoom(2);
         this.cameras.main.setRoundPixels(true);
+
+        const mapWidthInTiles = this.mapConsts.MAP_SIZE_X;
+        const mapHeightInTiles = this.mapConsts.MAP_SIZE_Y;
+        const tileHalfWidth = this.mapConsts.HALF_WIDTH;
+        const tileQuarterHeight = this.mapConsts.QUARTER_HEIGHT;
+
+        // Calculate the world coordinates of the map's bounding box
+        const worldMinX = this.origin.x - (mapHeightInTiles) * tileHalfWidth;
+        const worldMaxX = this.origin.x + (mapWidthInTiles) * tileHalfWidth;
+        const worldMinY = this.origin.y - 100; //- (mapHeightInTiles) * tileQuarterHeight;
+        const worldMaxY = this.origin.y + (mapWidthInTiles + mapHeightInTiles) * tileQuarterHeight;
+
+        const mapWorldWidth = worldMaxX - worldMinX;
+        const mapWorldHeight = worldMaxY - worldMinY;
+
+        const padding = 200; // Allow moving "a bit on each side"
+
+        this.cameras.main.setBounds(
+            worldMinX - padding,
+            worldMinY - padding,
+            mapWorldWidth + padding * 2,
+            mapWorldHeight + padding * 2
+        );
+
         this.cameras.main.centerOn(this.playerUnits[0].sprite.x, this.playerUnits[0].sprite.y);
 
         // --- Start Game ---
@@ -392,6 +435,25 @@ export class Game extends Phaser.Scene {
 
         // Disable the browser's context menu on right-click
         this.input.mouse.disableContextMenu();
+
+        // --- Vignette ---
+        const vignetteTexture = this.textures.createCanvas('vignetteCanvas', width, height);
+        const canvas = vignetteTexture.canvas;
+        const context = vignetteTexture.context;
+
+        const outerRadius = Math.sqrt(width * width + height * height) / 2;
+        const innerRadius = width / 3;
+
+        const grd = context.createRadialGradient(width / 2, height / 2, innerRadius, width / 2, height / 2, outerRadius);
+        grd.addColorStop(0, 'rgba(0,0,0,0)');
+        grd.addColorStop(1, 'rgba(0,0,0,0.5)');
+
+        context.fillStyle = grd;
+        context.fillRect(0, 0, width, height);
+
+        vignetteTexture.refresh(); // Refresh the texture
+        const vignetteImage = this.add.image(width / 2, height / 2, 'vignetteCanvas');
+        vignetteImage.setDepth(10000).setScrollFactor(0);
     }
 
     performEnhanceArmor(targetUnit) {
@@ -860,11 +922,15 @@ export class Game extends Phaser.Scene {
         closedList.add(`${startPos.x},${startPos.y}`);
 
         const enemyPositions = new Set();
-        if (color === 0x0000ff) { // Only avoid enemies for move highlights
+        const sceneryPositions = new Set();
+        if (color === 0x0000ff) { // Only avoid enemies and scenery for move highlights
             this.units.forEach(unit => {
                 if (unit !== this.activePlayerUnit) {
                     enemyPositions.add(`${unit.gridPos.x},${unit.gridPos.y}`);
                 }
+            });
+            this.sceneryObjects.forEach(scenery => {
+                sceneryPositions.add(`${scenery.gridPos.x},${scenery.gridPos.y}`);
             });
         }
 
@@ -882,6 +948,8 @@ export class Game extends Phaser.Scene {
                 if (closedList.has(posKey)) continue;
 
                 if (enemyPositions.has(posKey)) continue;
+
+                if (sceneryPositions.has(posKey)) continue;
 
                 if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
                     neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&

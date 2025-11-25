@@ -7,9 +7,9 @@ export class MainMenu extends Phaser.Scene {
         const { width } = this.scale;
 
         const container = this.add.container(width / 2, y);
-        container.setScale(0.4)
+        container.setScale(0.3)
         const background = this.add.image(0, 0, 'button_background');
-        background.setScale(0.8)
+        background.setScale(1)
 
         const label = this.add.bitmapText(0, 0, 'editundo_55', text, 55);
         label.setLetterSpacing(2);
@@ -44,7 +44,8 @@ export class MainMenu extends Phaser.Scene {
 
         create() {
             const { width, height } = this.scale;
-    
+
+
             // Add the background image first so it's behind everything else
             const bgImage = this.add.image(width / 2, height / 2, 'bg_main_screen');
             // Scale the image to fill the screen while maintaining aspect ratio
@@ -63,6 +64,20 @@ export class MainMenu extends Phaser.Scene {
                 ease: 'Sine.easeInOut',
                 yoyo: true,
                 repeat: -1
+            });
+
+            // Add leaf particles for a better menu look
+            this.add.particles(0, 0, 'pixel', {
+                emitZone: { source: new Phaser.Geom.Rectangle(0, height * 0.4, width, height * 0.5) },
+                lifespan: { min: 3000, max: 10000 },
+                speedX: { min: -8, max: 8 },
+                speedY: { min: -18, max: -30 },
+                scale: { start: 2, end: 0 },
+                alpha: { start: 0.8, end: 0 },
+                tint: 0xcbe578,
+                quantity: 1,
+                frequency: 25,
+                blendMode: 'ADD'
             });
     
             const buttonYStart = height / 2 + 50;
