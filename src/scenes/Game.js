@@ -10,7 +10,6 @@ import {testMap} from "../battle_maps/test_map.js";
 import {testArmy} from "../enemy_armies/test_army.js";
 import {defaultArmy} from "../player_armies/default_army.js";
 import {Scenery} from "../gameObjects/Scenery.js";
-import { HoloPipeline } from '../HoloPipeline.js'; // Adjust path as needed
 export class Game extends Phaser.Scene {
     constructor() {
         super('Game');
@@ -55,10 +54,6 @@ export class Game extends Phaser.Scene {
         // Clear previous animation arrays
         this.animTiles = [];
         this.animObjects = [];
-        const renderer = this.game.renderer;
-        if (renderer.pipelines) {
-            renderer.pipelines.add('Holo', new HoloPipeline(this.game));
-        }
         const battleMap = data.battleMap || testMap;
         const enemyArmy = data.enemyArmy || testArmy;
         const playerArmy = data.playerArmy || defaultArmy;

@@ -14,6 +14,7 @@ const config = {
     backgroundColor: '#00000000', // Transparent black
     pixelArt: true,
     antialias: false,
+    roundPixels: true,
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -21,7 +22,8 @@ const config = {
     scene: [Preloader, Background, Game, TimelineUI, ActionUI, GameOver, MainMenu],
     render: {
         pixelArt: true,
-        antialias: false
+        antialias: false,
+        roundPixels: true,
     }
 };
 
