@@ -10,7 +10,7 @@ import {testMap} from "../battle_maps/test_map.js";
 import {testArmy} from "../enemy_armies/test_army.js";
 import {defaultArmy} from "../player_armies/default_army.js";
 import {Scenery} from "../gameObjects/Scenery.js";
-
+import { HoloPipeline } from '../HoloPipeline.js'; // Adjust path as needed
 export class Game extends Phaser.Scene {
     constructor() {
         super('Game');
@@ -51,10 +51,14 @@ export class Game extends Phaser.Scene {
     }
 
     create(data) {
+
         // Clear previous animation arrays
         this.animTiles = [];
         this.animObjects = [];
-
+        const renderer = this.game.renderer;
+        if (renderer.pipelines) {
+            renderer.pipelines.add('Holo', new HoloPipeline(this.game));
+        }
         const battleMap = data.battleMap || testMap;
         const enemyArmy = data.enemyArmy || testArmy;
         const playerArmy = data.playerArmy || defaultArmy;
@@ -1228,110 +1232,141 @@ export class Game extends Phaser.Scene {
     takeEnemyTurn(enemy, onTurnComplete) {
         const attackMove = enemy.moves.find(m => m.type === 'attack');
 
-        // Find the closest player unit
-        let closestPlayerUnit = null;
-        let minDistance = Infinity;
-        for (const playerUnit of this.playerUnits) {
-            const distance = Math.abs(playerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(playerUnit.gridPos.y - enemy.gridPos.y);
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPlayerUnit = playerUnit;
-            }
-        }
+        // Helper to calculate Manhattan distance
+        const getDist = (a, b) => Math.abs(a.gridPos.x - b.gridPos.x) + Math.abs(a.gridPos.y - b.gridPos.y);
 
-        if (!closestPlayerUnit) {
-            onTurnComplete();
+        // 1. ATTACK IF ALREADY IN RANGE
+        const unitsInRange = this.playerUnits.filter(p => getDist(enemy, p) <= attackMove.range);
+
+        if (unitsInRange.length > 0) {
+            unitsInRange.sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
+            this.performEnemyAttack(enemy, unitsInRange[0], attackMove, onTurnComplete);
             return;
         }
 
-        const doAttack = (callback) => {
-            const dx = closestPlayerUnit.gridPos.x - enemy.gridPos.x;
-            const dy = closestPlayerUnit.gridPos.y - enemy.gridPos.y;
-            if (dx < 0 || (dx === 0 && dy < 0)) {
-                enemy.sprite.flipX = true;
-            } else {
-                enemy.sprite.flipX = false;
-            }
+        // 2. IDENTIFY ALL BLOCKED TILES (Units + Scenery)
+        // This is the specific fix: We map Scenery objects to coordinates just like we do for Units.
+        const blockedCoords = new Set();
 
-            enemy.attack(closestPlayerUnit, () => {
-                // Reset flipX after attack animation
-                enemy.sprite.flipX = false; // Assuming default is facing right
+        // Add all Units (except self)
+        this.units.forEach(u => {
+            if (u !== enemy) blockedCoords.add(`${u.gridPos.x},${u.gridPos.y}`);
+        });
 
-                const damageInfo = enemy.calculateDamage(closestPlayerUnit);
-                closestPlayerUnit.takeDamage(damageInfo, enemy, attackMove);
-                if (callback) {
-                    this.time.delayedCall(300, callback, []);
-                }
-            });
-        };
+        // Add all Scenery (Trees, Rocks, etc.)
+        // Note: If you have Chests or NPCs that block movement, add them here too!
+        this.sceneryObjects.forEach(s => {
+            blockedCoords.add(`${s.gridPos.x},${s.gridPos.y}`);
+        });
 
-        const distanceToTarget = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
+        // 3. FIND A MOVEMENT TARGET
+        const potentialTargets = [...this.playerUnits].sort((a, b) => getDist(enemy, a) - getDist(enemy, b));
 
-        if (distanceToTarget <= attackMove.range) {
-            doAttack(onTurnComplete);
-        } else {
-            const targetableTiles = [];
+        let chosenTarget = null;
+        let bestMoveTile = null;
+
+        for (const target of potentialTargets) {
             const neighbors = [
-                {x: closestPlayerUnit.gridPos.x + 1, y: closestPlayerUnit.gridPos.y}, {
-                    x: closestPlayerUnit.gridPos.x - 1,
-                    y: closestPlayerUnit.gridPos.y
-                },
-                {x: closestPlayerUnit.gridPos.x, y: closestPlayerUnit.gridPos.y + 1}, {
-                    x: closestPlayerUnit.gridPos.x,
-                    y: closestPlayerUnit.gridPos.y - 1
-                }
+                {x: target.gridPos.x + 1, y: target.gridPos.y},
+                {x: target.gridPos.x - 1, y: target.gridPos.y},
+                {x: target.gridPos.x, y: target.gridPos.y + 1},
+                {x: target.gridPos.x, y: target.gridPos.y - 1}
             ];
 
-            const occupiedPositions = new Set(this.units.map(u => `${u.gridPos.x},${u.gridPos.y}`));
+            const validAttackSpots = neighbors.filter(pos => {
+                // 1. Check Bounds
+                if (pos.x < 0 || pos.x >= this.mapConsts.MAP_SIZE_X ||
+                    pos.y < 0 || pos.y >= this.mapConsts.MAP_SIZE_Y) return false;
 
-            for (const neighbor of neighbors) {
-                if (neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
-                    neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
-                    this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x]) &&
-                    !occupiedPositions.has(`${neighbor.x},${neighbor.y}`)) {
-                    targetableTiles.push(neighbor);
-                }
-            }
+                // 2. Check Ground Type (Grass/Mud etc)
+                const isGroundWalkable = this.walkableTiles.includes(this.grid[pos.y][pos.x]);
 
-            if (targetableTiles.length > 0) {
-                const target = targetableTiles.sort((a, b) => {
+                // 3. Check for Obstacles (Units AND Scenery)
+                const isBlocked = blockedCoords.has(`${pos.x},${pos.y}`);
+
+                return isGroundWalkable && !isBlocked;
+            });
+
+            if (validAttackSpots.length > 0) {
+                chosenTarget = target;
+
+                // Sort spots by distance to enemy to minimize movement
+                validAttackSpots.sort((a, b) => {
                     const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
                     const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
                     return distA - distB;
-                })[0];
+                });
 
-                this.units.forEach(unit => {
-                    if (unit !== enemy) {
-                        this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
-                    }
-                });
-                this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, target.x, target.y, (path) => {
-                    if (path && path.length > 1) {
-                        const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
-                        this.moveCharacterAlongPath(enemy, truncatedPath, () => {
-                            const newDistance = Math.abs(closestPlayerUnit.gridPos.x - enemy.gridPos.x) + Math.abs(closestPlayerUnit.gridPos.y - enemy.gridPos.y);
-                            if (newDistance <= attackMove.range) {
-                                doAttack(onTurnComplete);
-                            } else {
-                                onTurnComplete();
-                            }
-                        });
-                    } else {
-                        onTurnComplete();
-                    }
-                    this.units.forEach(unit => {
-                        if (unit !== enemy) {
-                            this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
-                        }
-                    });
-                });
-                this.easystar.calculate();
+                bestMoveTile = validAttackSpots[0];
+                break;
+            }
+        }
+
+        // 4. EXECUTE MOVEMENT
+        if (chosenTarget && bestMoveTile) {
+            this.executeEnemyMove(enemy, bestMoveTile.x, bestMoveTile.y, () => {
+                if (getDist(enemy, chosenTarget) <= attackMove.range) {
+                    this.performEnemyAttack(enemy, chosenTarget, attackMove, onTurnComplete);
+                } else {
+                    onTurnComplete();
+                }
+            });
+        } else {
+            // Fallback: If all targets are physically surrounded (by units or trees),
+            // just move towards the closest player to apply pressure.
+            if (potentialTargets.length > 0) {
+                const fallback = potentialTargets[0];
+                this.executeEnemyMove(enemy, fallback.gridPos.x, fallback.gridPos.y, onTurnComplete);
             } else {
                 onTurnComplete();
             }
         }
     }
 
+    // --- Helper: Refactored Move Logic ---
+    executeEnemyMove(enemy, targetX, targetY, callback) {
+        // Setup avoidance
+        this.units.forEach(unit => {
+            if (unit !== enemy) {
+                this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+            }
+        });
+
+        this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, targetX, targetY, (path) => {
+            // Cleanup avoidance immediately
+            this.units.forEach(unit => {
+                if (unit !== enemy) {
+                    this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+                }
+            });
+
+            if (path && path.length > 1) {
+                const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
+                this.moveCharacterAlongPath(enemy, truncatedPath, callback);
+            } else {
+                // No path found (or start == end)
+                callback();
+            }
+        });
+        this.easystar.calculate();
+    }
+
+    // --- Helper: Refactored Attack Logic ---
+    performEnemyAttack(enemy, target, attackMove, callback) {
+        // Face the target
+        const dx = target.gridPos.x - enemy.gridPos.x;
+        // Simple flip logic (assuming right-facing sprite)
+        enemy.sprite.flipX = dx < 0;
+
+        enemy.attack(target, () => {
+            enemy.sprite.flipX = false; // Reset orientation
+            const damageInfo = enemy.calculateDamage(target);
+            target.takeDamage(damageInfo, enemy, attackMove);
+
+            // Add a small delay for visual pacing
+            this.time.delayedCall(300, callback);
+        });
+    }
 
     onUnitDied(unit) {
         if (unit.isPlayer) {

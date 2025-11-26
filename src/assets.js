@@ -48,7 +48,7 @@ export default {
         },
         dirt_1: {
             key: 'dirt_1',
-            args: ['src/assets/tiles/dirt_1.png']
+            args: ['src/assets/better_tiles/dirt_1.png']
         },
         dirt_2: {
             key: 'dirt_2',
