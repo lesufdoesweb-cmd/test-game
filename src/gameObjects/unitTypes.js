@@ -16,7 +16,7 @@ export const UNIT_TYPES = {
             critDamageMultiplier: 1.5,
             armor: 0
         },
-        moves: ['MOVE', 'ARROW_ATTACK']
+        moves: ['MOVE', 'ARROW_ATTACK', 'ARROW_RAIN']
     },
     'Orc': {
         name: 'Orc',

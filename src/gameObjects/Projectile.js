@@ -6,7 +6,7 @@ export class Projectile extends Phaser.GameObjects.Sprite {
 
         this.target = target;
         this.onComplete = onComplete;
-        this.speed = 0.4 ;// Speed in pixels per millisecond
+        this.speed = 0.8 ;// Speed in pixels per millisecond
 
         // Rotate projectile to face target
         this.rotation = Phaser.Math.Angle.Between(this.x, this.y, this.target.x, this.target.y);

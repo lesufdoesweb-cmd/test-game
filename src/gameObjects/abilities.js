@@ -38,5 +38,18 @@ export const ABILITIES = {
         currentCooldown: 0,
         amount: 1,
         icon: ASSETS.image.armor_up_icon.key
+    },
+    'ARROW_RAIN': {
+        name: 'Arrow Rain',
+        type: 'arrow_rain',
+        range: 99,
+        aoe: {
+            width: 2,
+            height: 2
+        },
+        cost: 1,
+        cooldown: 4,
+        currentCooldown: 0,
+        icon: ASSETS.image.arrow_rain_icon.key
     }
 };

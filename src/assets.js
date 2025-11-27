@@ -117,6 +117,10 @@ export default {
         bg_fights: {
             key: 'bg_fights',
             args: ['src/assets/backgrounds/bg_fights.png']
+        },
+        arrow_rain_icon: {
+            key: 'arrow_rain_icon',
+            args: ['src/assets/ability_icons/arrow_rain.png']
         }
     },
     'spritesheet': {

@@ -471,6 +471,8 @@ export class Game extends Phaser.Scene {
                     if (targetUnit && targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0x00ff00) { // Check tint
                         this.performEnhanceArmor(targetUnit);
                     }
+                } else if (this.playerActionState === 'arrow_rain') {
+                    this.performArrowRain(gridPos);
                 }
             }
         });
@@ -578,6 +580,88 @@ export class Game extends Phaser.Scene {
         this.events.emit('player_action_completed');
     }
 
+    performArrowRain(gridPos) {
+        const move = this.activeMove;
+        if (!move) return;
+
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+        this.activePlayerUnit.usedStandardAction = true;
+
+        const playerUnit = this.activePlayerUnit;
+
+        playerUnit.lungeUp(() => {
+            // This is the onImpactCallback of lungeUp
+            // Create 3 arrows shooting upwards
+            for (let i = 0; i < 3; i++) {
+                const projectile = new Projectile(
+                    this,
+                    playerUnit.sprite.x + (i * 10 - 10),
+                    playerUnit.sprite.y - 24,
+                    ASSETS.image.arrow_projectile.key,
+                    { x: playerUnit.sprite.x, y: playerUnit.sprite.y - 400 },
+                    () => {},
+                );
+                projectile.setDepth(9999);
+            }
+
+            // After a delay, start the arrow rain
+            this.time.delayedCall(500, () => {
+                const { width, height } = move.aoe;
+                const enemiesToHit = [];
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const tileX = gridPos.x + x;
+                        const tileY = gridPos.y + y;
+                        const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
+                        if (targetUnit && !targetUnit.isPlayer) {
+                            enemiesToHit.push(targetUnit);
+                        }
+                    }
+                }
+
+                const onHit = (target) => {
+                    const damageInfo = this.activePlayerUnit.calculateDamage(target);
+                    target.takeDamage(damageInfo, this.activePlayerUnit, move);
+                };
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const tileX = gridPos.x + x;
+                        const tileY = gridPos.y + y;
+
+                        const screenX = this.origin.x + (tileX - tileY) * this.mapConsts.HALF_WIDTH;
+                        const screenY = this.origin.y + (tileX + tileY) * this.mapConsts.QUARTER_HEIGHT;
+
+                        for (let i = 0; i < 3; i++) { // 3 arrows per tile
+                            const projectile = new Projectile(
+                                this,
+                                screenX + Phaser.Math.Between(-10, 10),
+                                screenY - 200, // Start from above the screen
+                                ASSETS.image.arrow_projectile.key,
+                                { x: screenX, y: screenY }, // Target position
+                                () => {
+                                    const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
+                                    if (targetUnit && !targetUnit.isPlayer && enemiesToHit.includes(targetUnit)) {
+                                        onHit(targetUnit);
+                                        enemiesToHit.splice(enemiesToHit.indexOf(targetUnit), 1); // only hit once
+                                    }
+                                }
+                            );
+                            projectile.setDepth(9999);
+                        }
+                    }
+                }
+
+                this.clearHighlights();
+                this.playerActionState = 'SELECTING_ACTION';
+                this.events.emit('player_action_completed');
+            });
+        });
+    }
+
     performPlayerAttack(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
@@ -609,15 +693,17 @@ export class Game extends Phaser.Scene {
         };
 
         if (move.type === 'arrow_attack') {
-            const projectile = new Projectile(
-                this,
-                playerUnit.sprite.x, // Use playerUnit.sprite.x
-                playerUnit.sprite.y - 24, // Start from near the unit's head
-                ASSETS.image.arrow_projectile.key,
-                targetUnit.sprite,
-                onHit
-            );
-            projectile.setDepth(9999);
+            playerUnit.attack(targetUnit, () => {
+                const projectile = new Projectile(
+                    this,
+                    playerUnit.sprite.x, // Use playerUnit.sprite.x
+                    playerUnit.sprite.y - 24, // Start from near the unit's head
+                    ASSETS.image.arrow_projectile.key,
+                    targetUnit.sprite,
+                    onHit
+                );
+                projectile.setDepth(9999);
+            });
         } else {
             playerUnit.attack(targetUnit, onHit);
         }
@@ -652,7 +738,7 @@ export class Game extends Phaser.Scene {
         }
 
         const actionState = this.playerActionState;
-        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor') {
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor' || actionState === 'arrow_rain') {
             const pointer = this.input.activePointer;
             const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
@@ -664,13 +750,22 @@ export class Game extends Phaser.Scene {
                 if (actionState === 'attack' || actionState === 'arrow_attack') color = 0xff0000;
                 if (actionState === 'enhance_armor') color = 0x00ff99;
 
-                const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
-                const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
+                if (actionState === 'arrow_rain') {
+                    if (this.hoverIndicator) {
+                        this.hoverIndicator.destroy();
+                    }
+                    const animatedY = this.hoverAnimY;
+                    this.hoverIndicator = this.createAOEIndicator(gridPos.x, gridPos.y, 0xff0000, 1);
+                    this.hoverIndicator.y += animatedY;
+                } else {
+                    const screenX = this.origin.x + (gridPos.x - gridPos.y) * this.mapConsts.HALF_WIDTH + 2;
+                    const screenY = this.origin.y + (gridPos.x + gridPos.y) * this.mapConsts.QUARTER_HEIGHT - 6;
 
-                // Use the animated value to offset the Y position
-                const animatedY = screenY + this.hoverAnimY;
+                    // Use the animated value to offset the Y position
+                    const animatedY = screenY + this.hoverAnimY;
 
-                this.hoverIndicator = this.createCornerIsometricIndicator(screenX, animatedY, color, 1);
+                    this.hoverIndicator = this.createCornerIsometricIndicator(screenX, animatedY, color, 1);
+                }
                 this.hoverIndicator.setDepth(9999); // Set a high depth to ensure it's on top
             }
         }
@@ -773,6 +868,87 @@ export class Game extends Phaser.Scene {
         graphics.setDepth(100);
 
         return graphics;
+    }
+
+    createAOEIndicator(gridX, gridY, color = 0xff0000, alpha = 1) {
+        const aoeGraphics = this.add.graphics();
+        const { width, height } = this.activeMove.aoe;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const tileX = gridX + x;
+                const tileY = gridY + y;
+
+                const screenX = this.origin.x + (tileX - tileY) * this.mapConsts.HALF_WIDTH + 2;
+                const screenY = this.origin.y + (tileX + tileY) * this.mapConsts.QUARTER_HEIGHT - 6;
+
+                // --- SETTINGS FOR SLEEK LOOK ---
+                const lineWidth = 2;       // Thinner lines (was 3)
+                const legLength = 0.15;    // Shorter legs (was 0.25)
+                const padding = 2;         // Push corners out by 2px for "breathing room"
+
+                // 1. Setup Dimensions
+                const indicatorWidth = this.mapConsts.TILE_WIDTH + (padding * 2);
+                const indicatorHeight = (this.mapConsts.TILE_WIDTH * 0.5) + (padding); // Maintain aspect ratio
+
+                aoeGraphics.lineStyle(lineWidth, color, alpha);
+
+                // 2. Calculate relative coordinates
+                const halfW = indicatorWidth / 2;
+                const halfH = indicatorHeight / 2;
+
+                // The 4 Points of the diamond
+                const top = { x: screenX, y: screenY - halfH };
+                const right = { x: screenX + halfW, y: screenY };
+                const bottom = { x: screenX, y: screenY + halfH };
+                const left = { x: screenX - halfW, y: screenY };
+
+                // Linear Interpolation Helper
+                const lerp = (p1, p2, t) => ({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t
+                });
+
+                // --- DRAWING ---
+
+                // Top Bracket
+                const t_left = lerp(top, left, legLength);
+                const t_right = lerp(top, right, legLength);
+                aoeGraphics.beginPath();
+                aoeGraphics.moveTo(t_left.x, t_left.y);
+                aoeGraphics.lineTo(top.x, top.y);
+                aoeGraphics.lineTo(t_right.x, t_right.y);
+                aoeGraphics.strokePath();
+
+                // Right Bracket
+                const r_top = lerp(right, top, legLength);
+                const r_btm = lerp(right, bottom, legLength);
+                aoeGraphics.beginPath();
+                aoeGraphics.moveTo(r_top.x, r_top.y);
+                aoeGraphics.lineTo(right.x, right.y);
+                aoeGraphics.lineTo(r_btm.x, r_btm.y);
+                aoeGraphics.strokePath();
+
+                // Bottom Bracket
+                const b_right = lerp(bottom, right, legLength);
+                const b_left = lerp(bottom, left, legLength);
+                aoeGraphics.beginPath();
+                aoeGraphics.moveTo(b_right.x, b_right.y);
+                aoeGraphics.lineTo(bottom.x, bottom.y);
+                aoeGraphics.lineTo(b_left.x, b_left.y);
+                aoeGraphics.strokePath();
+
+                // Left Bracket
+                const l_btm = lerp(left, bottom, legLength);
+                const l_top = lerp(left, top, legLength);
+                aoeGraphics.beginPath();
+                aoeGraphics.moveTo(l_btm.x, l_btm.y);
+                aoeGraphics.lineTo(left.x, left.y);
+                aoeGraphics.lineTo(l_top.x, l_top.y);
+                aoeGraphics.strokePath();
+            }
+        }
+        return aoeGraphics;
     }
 
     moveUnit(unit, targetX, targetY) {
@@ -1081,7 +1257,7 @@ export class Game extends Phaser.Scene {
         this.playerActionState = move.type;
         this.events.emit('player_action_selected');
 
-        if (move.type === 'attack' || move.type === 'arrow_attack') {
+        if (move.type === 'attack' || move.type === 'arrow_attack' || move.type === 'arrow_rain') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0xff0000);
             this.highlightAttackableEnemies(move.range);
         } else if (move.type === 'move') {

@@ -254,6 +254,56 @@ export class Unit {
         });
     }
 
+    lungeUp(onImpactCallback) {
+        const scene = this.scene;
+
+        // Define objects to animate (Sprite + Shadow)
+        const targets = this.shadow ? [this.sprite, this.shadow] : [this.sprite];
+
+        // 1. Calculate direction vector
+        const startX = this.sprite.x;
+        const startY = this.sprite.y;
+        const lungeY = -20; // Move 20 pixels up
+
+        // Store original position if not already stored
+        const originalY = this.sprite.getData('originalY') || startY;
+
+        // SEQUENCE: Windup -> Strike -> Impact -> Recoil
+
+        // 1. Wind Up (Pull back slowly)
+        scene.tweens.add({
+            targets: targets,
+            y: startY + 10,
+            duration: 150,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+
+                // 2. The Strike (Dash forward FAST)
+                scene.tweens.add({
+                    targets: targets,
+                    y: startY + lungeY,
+                    duration: 60, // Very fast
+                    ease: 'Expo.easeIn',
+                    onComplete: () => {
+
+                        // --- IMPACT MOMENT ---
+                        if (onImpactCallback) onImpactCallback();
+
+                        // 3. Recoil (Bounce back)
+                        scene.tweens.add({
+                            targets: targets,
+                            x: startX,
+                            y: originalY,
+                            duration: 300,
+                            delay: 100, // Small "Hit Stop" pause at the point of impact
+                            ease: 'Back.easeOut'
+                        });
+                    }
+                });
+            }
+        });
+    }
+
     takeDamage(damageInfo, attacker = null, move = null) {
         const { damage, isCrit } = damageInfo;
         const finalDamage = Math.floor(damage);
