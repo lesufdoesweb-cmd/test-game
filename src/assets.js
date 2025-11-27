@@ -121,6 +121,66 @@ export default {
         arrow_rain_icon: {
             key: 'arrow_rain_icon',
             args: ['src/assets/ability_icons/arrow_rain.png']
+        },
+        trap_icon: {
+            key: 'trap_icon',
+            args: ['src/assets/ability_icons/trap.png']
+        },
+        bear_trap: {
+            key: 'bear_trap',
+            args: ['src/assets/projectiles/bear_trap.png']
+        },
+        paladin: {
+            key: 'paladin',
+            args: ['src/assets/units/paladin.png']
+        },
+        basic_heal_icon: {
+            key: 'basic_heal_icon',
+            args: ['src/assets/ability_icons/basic_heal.png']
+        },
+        wizard: {
+            key: 'wizard',
+            args: ['src/assets/units/wizard.png']
+        },
+        fireball_icon: {
+            key: 'fireball_icon',
+            args: ['src/assets/ability_icons/fireball.png']
+        },
+        fireball_projectile: {
+            key: 'fireball_projectile',
+            args: ['src/assets/projectiles/fireball.png']
+        },
+        freeze_icon: {
+            key: 'freeze_icon',
+            args: ['src/assets/ability_icons/freeze.png']
+        },
+        freeze_ball_projectile: {
+            key: 'freeze_ball_projectile',
+            args: ['src/assets/projectiles/freeze_ball.png']
+        },
+        bg_char_selection: {
+            key: 'bg_char_selection',
+            args: ['src/assets/backgrounds/bg_char_selection.png']
+        },
+        unit_card_common: {
+            key: 'unit_card_common',
+            args: ['src/assets/user_interface/unit_card_common.png']
+        },
+        unit_card_rare: {
+            key: 'unit_card_rare',
+            args: ['src/assets/user_interface/unit_card_rare.png']
+        },
+        unit_card_epic: {
+            key: 'unit_card_epic',
+            args: ['src/assets/user_interface/unit_card_epic.png']
+        },
+        unit_card_legendary: {
+            key: 'unit_card_legendary',
+            args: ['src/assets/user_interface/unit_card_legendary.png']
+        },
+        refresh_button: {
+            key: 'refresh_button',
+            args: ['src/assets/user_interface/refresh_button.png']
         }
     },
     'spritesheet': {

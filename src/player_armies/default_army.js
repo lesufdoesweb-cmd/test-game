@@ -1,4 +1,4 @@
 export const defaultArmy = {
     name: "Default Army",
-    units: ['Archer', 'Archer', 'Knight']
+    units: ['Wizard', 'Paladin', 'Knight', 'Archer']
 };

@@ -107,4 +107,8 @@ export class MainMenu extends Phaser.Scene {
             this.createButton(buttonYStart, 'Start Game', () => {
                 this.scene.start('Game');
             });
+
+            this.createButton(buttonYStart + 50, 'Squad Upgrade', () => {
+                this.scene.start('SquadUpgrade');
+            });
         }}

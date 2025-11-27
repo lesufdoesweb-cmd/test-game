@@ -33,6 +33,7 @@ export class Unit {
 
         this.hasMoved = false;
         this.usedStandardAction = false;
+        this.isHighlighted = false;
 
         const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
         const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
@@ -144,6 +145,15 @@ export class Unit {
         // Update depth based on Y for isometric sorting
         this.sprite.setDepth(this.sprite.y + 16);
         this.updateHealthBar();
+
+        const burnEffect = this.statusEffects.find(effect => effect.type === 'burn');
+        if (burnEffect) {
+            this.sprite.setTint(0xff0000);
+        }
+        const freezeEffect = this.statusEffects.find(effect => effect.type === 'freeze');
+        if (freezeEffect) {
+            this.sprite.setTint(0x0000ff);
+        }
 
         // Armor up logic (Unchanged)
         const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
@@ -302,6 +312,15 @@ export class Unit {
                 });
             }
         });
+    }
+
+    heal(amount) {
+        this.stats.currentHealth += amount;
+        if (this.stats.currentHealth > this.stats.maxHealth) {
+            this.stats.currentHealth = this.stats.maxHealth;
+        }
+        this.updateHealthBar();
+        this.scene.events.emit('unit_stats_changed', this);
     }
 
     takeDamage(damageInfo, attacker = null, move = null) {

@@ -10,6 +10,7 @@ import {testMap} from "../battle_maps/test_map.js";
 import {testArmy} from "../enemy_armies/test_army.js";
 import {defaultArmy} from "../player_armies/default_army.js";
 import {Scenery} from "../gameObjects/Scenery.js";
+import {Trap} from "../gameObjects/Trap.js";
 export class Game extends Phaser.Scene {
     constructor() {
         super('Game');
@@ -18,6 +19,7 @@ export class Game extends Phaser.Scene {
         this.playerUnits = [];
         this.units = []; // This will hold all Unit objects
         this.sceneryObjects = [];
+        this.traps = [];
         this.grid = [];
         this.origin = {x: 0, y: 0};
         this.mapConsts = {
@@ -460,7 +462,7 @@ export class Game extends Phaser.Scene {
                 if (this.playerActionState === 'move') {
                     this.moveUnit(this.activePlayerUnit, gridPos.x, gridPos.y);
 
-                } else if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack') {
+                } else if (this.playerActionState === 'attack' || this.playerActionState === 'arrow_attack' || this.playerActionState === 'fireball' || this.playerActionState === 'freeze_ball') {
                     const targetUnit = this.getUnitAtGridPos(gridPos);
                     if (targetUnit && !targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0xff0000) { // Check tint, which confirms it's a valid highlighted target
                         this.performPlayerAttack(targetUnit);
@@ -473,6 +475,13 @@ export class Game extends Phaser.Scene {
                     }
                 } else if (this.playerActionState === 'arrow_rain') {
                     this.performArrowRain(gridPos);
+                } else if (this.playerActionState === 'trap') {
+                    this.performTrapPlacement(gridPos);
+                } else if (this.playerActionState === 'basic_heal') {
+                    const targetUnit = this.getUnitAtGridPos(gridPos);
+                    if (targetUnit && targetUnit.isPlayer && targetUnit.sprite.tintTopLeft === 0x00ff00) {
+                        this.performHeal(targetUnit);
+                    }
                 }
             }
         });
@@ -574,6 +583,54 @@ export class Game extends Phaser.Scene {
         move.currentCooldown = move.cooldown;
 
         targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration, amount: move.amount });
+
+        this.clearHighlights();
+        this.playerActionState = 'SELECTING_ACTION';
+        this.events.emit('player_action_completed');
+    }
+
+    performHeal(targetUnit) {
+        const move = this.activeMove;
+        if (!move) return;
+
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+        this.activePlayerUnit.usedStandardAction = true;
+
+        this.activePlayerUnit.attack(targetUnit, () => {
+            targetUnit.heal(move.amount);
+
+            const emitter = this.add.particles(targetUnit.sprite.x, targetUnit.sprite.y, 'particle', {
+                speed: {min: 20, max: 40},
+                angle: {min: 0, max: 360},
+                scale: {start: 4, end: 0},
+                alpha: {start: 0.6, end: 0},
+                lifespan: 1000,
+                tint: [0x00ff00, 0x00bf00],
+                emitting: false
+            });
+            emitter.setDepth(99999);
+            emitter.explode(20);
+            this.time.delayedCall(1000, () => emitter.destroy());
+
+            this.clearHighlights();
+            this.playerActionState = 'SELECTING_ACTION';
+            this.events.emit('player_action_completed');
+        });
+    }
+
+    performTrapPlacement(gridPos) {
+        const move = this.activeMove;
+        if (!move) return;
+
+        this.activePlayerUnit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', this.activePlayerUnit);
+        move.currentCooldown = move.cooldown;
+        this.activePlayerUnit.usedStandardAction = true;
+
+        const trap = new Trap(this, { gridX: gridPos.x, gridY: gridPos.y });
+        this.traps.push(trap);
 
         this.clearHighlights();
         this.playerActionState = 'SELECTING_ACTION';
@@ -687,6 +744,9 @@ export class Game extends Phaser.Scene {
 
             const damageInfo = playerUnit.calculateDamage(targetUnit);
             targetUnit.takeDamage(damageInfo, playerUnit, move);
+            if(move.status){
+                targetUnit.addStatusEffect(move.status);
+            }
             this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
@@ -699,6 +759,30 @@ export class Game extends Phaser.Scene {
                     playerUnit.sprite.x, // Use playerUnit.sprite.x
                     playerUnit.sprite.y - 24, // Start from near the unit's head
                     ASSETS.image.arrow_projectile.key,
+                    targetUnit.sprite,
+                    onHit
+                );
+                projectile.setDepth(9999);
+            });
+        } else if (move.type === 'fireball') {
+            playerUnit.attack(targetUnit, () => {
+                const projectile = new Projectile(
+                    this,
+                    playerUnit.sprite.x,
+                    playerUnit.sprite.y - 24,
+                    ASSETS.image.fireball_projectile.key,
+                    targetUnit.sprite,
+                    onHit
+                );
+                projectile.setDepth(9999);
+            });
+        } else if (move.type === 'freeze_ball') {
+            playerUnit.attack(targetUnit, () => {
+                const projectile = new Projectile(
+                    this,
+                    playerUnit.sprite.x,
+                    playerUnit.sprite.y - 24,
+                    ASSETS.image.freeze_ball_projectile.key,
                     targetUnit.sprite,
                     onHit
                 );
@@ -738,7 +822,7 @@ export class Game extends Phaser.Scene {
         }
 
         const actionState = this.playerActionState;
-        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor' || actionState === 'arrow_rain') {
+        if (actionState === 'move' || actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'enhance_armor' || actionState === 'arrow_rain' || actionState === 'fireball' || actionState === 'freeze_ball') {
             const pointer = this.input.activePointer;
             const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             const gridPos = this.screenToGrid(worldPoint.x, worldPoint.y);
@@ -747,7 +831,7 @@ export class Game extends Phaser.Scene {
 
             if (isTileValid) {
                 let color = 0xffffff; // Default for move
-                if (actionState === 'attack' || actionState === 'arrow_attack') color = 0xff0000;
+                if (actionState === 'attack' || actionState === 'arrow_attack' || actionState === 'fireball' || actionState === 'freeze_ball') color = 0xff0000;
                 if (actionState === 'enhance_armor') color = 0x00ff99;
 
                 if (actionState === 'arrow_rain') {
@@ -986,6 +1070,17 @@ export class Game extends Phaser.Scene {
             return;
         }
 
+        // Check for traps along the path
+        for (let i = 1; i < path.length; i++) {
+            const pos = path[i];
+            const trapIndex = this.traps.findIndex(t => t.gridPos.x === pos.x && t.gridPos.y === pos.y);
+            if (trapIndex > -1) {
+                // Found a trap, truncate the path to this point
+                path = path.slice(0, i + 1);
+                break;
+            }
+        }
+
         this.isMoving = true;
         this.events.emit('unit_is_moving');
 
@@ -1055,6 +1150,16 @@ export class Game extends Phaser.Scene {
                 unit.gridPos.x = lastPos.x;
                 unit.gridPos.y = lastPos.y;
                 this.isMoving = false;
+
+                // Check for trap at destination
+                const trapIndex = this.traps.findIndex(t => t.gridPos.x === lastPos.x && t.gridPos.y === lastPos.y);
+                if (trapIndex > -1) {
+                    const trap = this.traps[trapIndex];
+                    this.time.delayedCall(100, () => { // Add a small delay for visual clarity
+                        trap.trigger(unit);
+                        this.traps.splice(trapIndex, 1);
+                    });
+                }
 
                 unit.sprite.setData('prevX', undefined);
 
@@ -1135,7 +1240,21 @@ export class Game extends Phaser.Scene {
         // Decrement status effect durations for the current unit
         currentUnit.statusEffects.forEach(effect => {
             effect.duration--;
+            if (effect.type === 'burn') {
+                currentUnit.takeDamage({ damage: effect.damage, isCrit: false });
+            }
         });
+
+        // Handle freeze effect
+        const freezeEffect = currentUnit.statusEffects.find(effect => effect.type === 'freeze');
+        if (freezeEffect) {
+            // Remove the freeze effect after skipping a turn
+            currentUnit.statusEffects = currentUnit.statusEffects.filter(effect => effect.type !== 'freeze');
+            this.turnIndex = (this.turnIndex + 1) % this.turnOrder.length;
+            this.startNextTurn();
+            return;
+        }
+
         // Remove expired effects
         currentUnit.statusEffects = currentUnit.statusEffects.filter(effect => effect.duration > 0);
 
@@ -1257,7 +1376,7 @@ export class Game extends Phaser.Scene {
         this.playerActionState = move.type;
         this.events.emit('player_action_selected');
 
-        if (move.type === 'attack' || move.type === 'arrow_attack' || move.type === 'arrow_rain') {
+        if (move.type === 'attack' || move.type === 'arrow_attack' || move.type === 'arrow_rain' || move.type === 'fireball' || move.type === 'freeze_ball') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0xff0000);
             this.highlightAttackableEnemies(move.range);
         } else if (move.type === 'move') {
@@ -1265,6 +1384,11 @@ export class Game extends Phaser.Scene {
         } else if (move.type === 'enhance_armor') {
             this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x00ff99); // Show ability range
             this.highlightFriendlyTargets(move.range);
+        } else if (move.type === 'trap') {
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x00ff00);
+        } else if (move.type === 'basic_heal') {
+            this.highlightRange(this.activePlayerUnit.gridPos, move.range, 0x00ff99);
+            this.highlightHealableAllies(move.range);
         }
     }
 
@@ -1302,6 +1426,11 @@ export class Game extends Phaser.Scene {
             });
             this.sceneryObjects.forEach(scenery => {
                 sceneryPositions.add(`${scenery.gridPos.x},${scenery.gridPos.y}`);
+            });
+        }
+        if (color === 0x00ff00) { // Avoid any unit for trap placement
+            this.units.forEach(unit => {
+                enemyPositions.add(`${unit.gridPos.x},${unit.gridPos.y}`);
             });
         }
 
@@ -1351,6 +1480,15 @@ export class Game extends Phaser.Scene {
         }
     }
 
+    highlightHealableAllies(range) {
+        for (const unit of this.playerUnits) {
+            const distance = Math.abs(this.activePlayerUnit.gridPos.x - unit.gridPos.x) + Math.abs(this.activePlayerUnit.gridPos.y - unit.gridPos.y);
+            if (distance <= range && unit.stats.currentHealth < unit.stats.maxHealth) {
+                unit.sprite.setTint(0x00ff00); // Green tint for valid targets
+            }
+        }
+    }
+
     highlightAttackableEnemies(range) {
         const enemies = this.units.filter(u => !u.isPlayer);
         for (const enemy of enemies) {
@@ -1362,7 +1500,11 @@ export class Game extends Phaser.Scene {
     }
 
     clearHighlights() {
-        this.units.forEach(u => u.sprite.clearTint());
+        this.units.forEach(u => {
+            if (u.statusEffects.length === 0) {
+                u.sprite.clearTint();
+            }
+        });
         if (this.rangeHighlights) {
             this.rangeHighlights.forEach(h => h.destroy());
             this.rangeHighlights = [];
