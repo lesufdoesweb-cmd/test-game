@@ -1,10 +1,11 @@
 import ASSETS from '../assets.js';
 
 export class UnitCard {
-    constructor(scene, x, y, { unit, rarity, stats }) {
+    constructor(scene, x, y, config) {
         this.scene = scene;
         this.x = x;
         this.y = y;
+        this.config = config; // Store the whole config
 
         this.rarityEmitter = null;
         this.idleTween = null;
@@ -35,7 +36,7 @@ export class UnitCard {
         this.outlineFX = this.innerCardContainer.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 24);
 
         // Setup Visuals (populates innerCardContainer)
-        this.setupCardVisuals(unit, rarity, stats);
+        this.setupCardVisuals(this.config.unit, this.config.rarity, this.config.stats);
 
         // Setup Interaction on the outer container
         this.cardContainer.setSize(this.width, this.height);
@@ -44,7 +45,6 @@ export class UnitCard {
 
         // Initial Spawn
         this.cardContainer.setScale(0);
-        this.playSpawnAnimation();
     }
 
     setupInteractions() {
@@ -129,7 +129,12 @@ export class UnitCard {
         const bgKey = cardBackgrounds[rarity];
 
         // Update Shadow Texture
-        this.shadow.setTexture(bgKey);
+        if (this.shadow) this.shadow.destroy();
+        this.shadow = this.scene.add.image(10, 10, bgKey);
+        this.shadow.setTint(0x000000);
+        this.shadow.setAlpha(0.5);
+        this.cardContainer.add(this.shadow);
+        this.cardContainer.sendToBack(this.shadow);
 
         // --- Add elements to Inner Container ---
         const bg = this.scene.add.image(0, 0, bgKey);
@@ -165,7 +170,7 @@ export class UnitCard {
 
         let matkText = null;
         if (stats.magicDamage > 0) {
-            matkText = this.scene.add.bitmapText(0, 70, 'editundo_55', `MATK: ${stats.magicDamage}`, 28)
+            matkText = this.scene.add.bitmapText(0, 42, 'editundo_55', `MATK: ${stats.magicDamage}`, 28)
                 .setOrigin(0.5).setLetterSpacing(2).setScale(0.25);
             this.innerCardContainer.add(matkText);
         }
@@ -261,10 +266,13 @@ export class UnitCard {
 
     destroy() {
         if(this.cardContainer) this.cardContainer.destroy();
-        this.clearLegendaryParticles();
+        this.clearRarityParticles();
     }
 
     refreshContent(newConfig) {
+        this.config = newConfig; // Update the internal config
+        const { unit, rarity, stats } = newConfig;
+
         this.isAnimating = true;
         this.stopIdleAnimation();
         this.outlineFX.outerStrength = 0; // Turn off hover glow
@@ -296,7 +304,7 @@ export class UnitCard {
             {
                 at: jumpDuration + (flipDuration / 2),
                 run: () => {
-                    this.setupCardVisuals(newConfig.unit, newConfig.rarity, newConfig.stats);
+                    this.setupCardVisuals(unit, rarity, stats);
                     this.setHiddenState();
                     // Update size on outer container
                     this.cardContainer.setSize(this.width, this.height);
@@ -321,8 +329,8 @@ export class UnitCard {
                     onUpdate: (tween, target) => {
                         if (!hasRevealed && target.y >= this.y - 10) {
                             hasRevealed = true;
-                            this.revealContent(newConfig.rarity);
-                            this.playDustEffect(newConfig.rarity);
+                            this.revealContent(rarity);
+                            this.playDustEffect(rarity);
                         }
                     },
                     onComplete: () => {

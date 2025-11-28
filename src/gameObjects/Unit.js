@@ -1,11 +1,13 @@
 import ASSETS from '../assets.js';
+import { getBoostedStats } from '../utils/rarity.js';
 
 export class Unit {
-    constructor(scene, { gridX, gridY, texture, frame, name, stats, isPlayer = false, moves = [] }) {
+    constructor(scene, { gridX, gridY, texture, frame, name, stats, isPlayer = false, moves = [], rarity = 'common' }) {
         this.scene = scene;
         this.name = name;
         this.isPlayer = isPlayer;
-        this.stats = {
+        this.rarity = rarity;
+        this.stats = getBoostedStats({
             maxHealth: 100,
             currentHealth: 100,
             moveRange: 4,
@@ -18,7 +20,7 @@ export class Unit {
             critDamageMultiplier: 1.5,
             armor: 0,
             ...stats
-        };
+        }, rarity);
 
         // Defensive checks
         if (typeof this.stats.physicalDamage !== 'number') this.stats.physicalDamage = 10;
@@ -236,8 +238,16 @@ export class Unit {
         }
     }
 
-    calculateDamage(targetUnit) {
-        const baseDamage = this.stats.physicalDamage;
+    calculateDamage(targetUnit, ability) {
+        let baseDamage = 0;
+        if (ability.damageType === 'magical') {
+            baseDamage = this.stats.magicDamage || 0;
+        } else {
+            baseDamage = this.stats.physicalDamage || 0;
+        }
+
+        baseDamage *= (ability.modifier || 1.0);
+
         const targetStats = targetUnit.getEffectiveStats();
 
         // Variance
@@ -258,6 +268,12 @@ export class Unit {
         damage *= damageMultiplier;
 
         return { damage: Math.floor(damage), isCrit: isCrit };
+    }
+
+    calculateHeal(healAbility) {
+        const baseHeal = healAbility.amount || 0;
+        const modifier = healAbility.modifier || 1.0;
+        return Math.floor(baseHeal * modifier);
     }
 
     attack(target, onImpactCallback) {

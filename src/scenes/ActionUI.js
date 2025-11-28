@@ -28,6 +28,7 @@ export class ActionUI extends Phaser.Scene {
         this.gameScene.events.on('action_cancelled', () => this.showActions(this.gameScene.activePlayerUnit), this);
         this.gameScene.events.on('player_action_completed', () => this.showActions(this.gameScene.activePlayerUnit), this);
         this.gameScene.events.on('unit_is_moving', () => this.cancelActionButton.setVisible(false), this);
+        this.gameScene.events.on('unit_right_clicked', this.showUnitTooltip, this);
 
         this.input.on('dragstart', (pointer, gameObject) => {
             if (!gameObject.getData('isDraggable')) return;
@@ -71,6 +72,21 @@ export class ActionUI extends Phaser.Scene {
             }
             this.draggingKey = null;
         });
+    }
+
+    showUnitTooltip(unit) {
+        const stats = unit.getEffectiveStats();
+        let content = `${unit.name} [${unit.rarity.toUpperCase()}]\n\n`;
+        content += `HP: ${stats.currentHealth} / ${stats.maxHealth}\n`;
+        content += `Phys DMG: ${stats.physicalDamage}\n`;
+        if (stats.magicDamage > 0) {
+            content += `Magic DMG: ${stats.magicDamage}\n`;
+        }
+        content += `Armor: ${stats.armor}\n`;
+        content += `Speed: ${stats.speed}`;
+
+        this.showCenteredTooltip(content);
+        this.gameScene.input.once('pointerup', this.hideTooltip, this);
     }
 
     showTooltip(content, anchorX, anchorY) {

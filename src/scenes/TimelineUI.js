@@ -7,15 +7,23 @@ export class TimelineUI extends Phaser.Scene {
     }
 
     create({ turnOrder }) {
+        this.portraits = [];
         this.turnOrder = turnOrder;
         this.gameScene = this.scene.get('Game');
 
         this.createPortraits();
 
         this.gameScene.events.on('turn_changed', this.updateTimeline, this);
+        this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
         
         // Initial draw
         this.updateTimeline(0);
+    }
+
+    shutdown() {
+        if (this.gameScene) {
+            this.gameScene.events.off('turn_changed', this.updateTimeline, this);
+        }
     }
 
     createPortraits() {

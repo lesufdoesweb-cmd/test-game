@@ -7,7 +7,14 @@
     <list default="true" id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="redo">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/gameObjects/Unit.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/Unit.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/gameObjects/abilities.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/abilities.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/gameObjects/unitTypes.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/unitTypes.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/ActionUI.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/ActionUI.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/scenes/Game.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/Game.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/MainMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/MainMenu.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/TimelineUI.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/TimelineUI.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/UnitCard.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UnitCard.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,6 +32,18 @@
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "lesufdoesweb-cmd"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/lesufdoesweb-cmd/test-game.git",
+    "accountId": "2cc5c27c-60ad-4a27-b637-3cbe5ceffea0"
+  }
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 7
 }</component>
@@ -66,7 +85,7 @@
       <workItem from="1764230431012" duration="613000" />
       <workItem from="1764242525923" duration="12649000" />
       <workItem from="1764322126504" duration="607000" />
-      <workItem from="1764324415694" duration="2883000" />
+      <workItem from="1764324415694" duration="9675000" />
     </task>
     <task id="LOCAL-00001" summary="redo">
       <option name="closed" value="true" />
@@ -108,7 +127,15 @@
       <option name="project" value="LOCAL" />
       <updated>1764326096614</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764327821540</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1764327821540</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

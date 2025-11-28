@@ -104,11 +104,13 @@ export class MainMenu extends Phaser.Scene {
     
             const buttonYStart = height / 2 + 50;
     
-            this.createButton(buttonYStart, 'Start Game', () => {
-                this.scene.start('Game');
-            });
+            this.createButton(buttonYStart, 'Start', () => {
+                // Initialize game state in the registry
+                this.registry.set('level', 1);
+                this.registry.set('playerArmy', []);
+                this.registry.set('shopRefreshes', 3);
+                this.registry.set('isFirstTime', true);
 
-            this.createButton(buttonYStart + 50, 'Squad Upgrade', () => {
                 this.scene.start('SquadUpgrade');
             });
         }}

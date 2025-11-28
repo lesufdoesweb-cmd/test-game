@@ -17,6 +17,8 @@ export const ABILITIES = {
         cost: 1,
         cooldown: 1,
         currentCooldown: 0,
+        damageType: 'physical',
+        modifier: 1.0,
         icon: ASSETS.image.basic_attack_icon.key
     },
 'ARROW_ATTACK': {
@@ -26,6 +28,8 @@ export const ABILITIES = {
         cost: 1,
         cooldown: 1,
         currentCooldown: 0,
+        damageType: 'physical',
+        modifier: 1.0,
         icon: ASSETS.image.arrow_attack_icon.key
     },
     'ENHANCE_ARMOR': {
@@ -50,6 +54,8 @@ export const ABILITIES = {
         cost: 1,
         cooldown: 4,
         currentCooldown: 0,
+        damageType: 'physical',
+        modifier: 0.8,
         icon: ASSETS.image.arrow_rain_icon.key
     },
     'TRAP': {
@@ -69,6 +75,7 @@ export const ABILITIES = {
         cooldown: 2,
         currentCooldown: 0,
         amount: 30,
+        modifier: 1.0,
         icon: ASSETS.image.basic_heal_icon.key
     },
     'FIREBALL': {
@@ -79,6 +86,8 @@ export const ABILITIES = {
         cooldown: 2,
         currentCooldown: 0,
         damage: 25,
+        damageType: 'magical',
+        modifier: 1.2,
         status: { type: 'burn', duration: 1, damage: 10 },
         icon: ASSETS.image.fireball_icon.key
     },
@@ -90,6 +99,8 @@ export const ABILITIES = {
         cooldown: 2,
         currentCooldown: 0,
         damage: 15,
+        damageType: 'magical',
+        modifier: 0.9,
         status: { type: 'freeze', duration: 1 },
         icon: ASSETS.image.freeze_icon.key
     }

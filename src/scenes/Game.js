@@ -52,10 +52,38 @@ export class Game extends Phaser.Scene {
     }
 
     create(data) {
-
-        // Clear previous animation arrays
+        // --- SCENE STATE RESET ---
+        this.playerUnits = [];
+        this.units = [];
+        this.sceneryObjects = [];
+        this.traps = [];
+        this.grid = [];
+        this.rangeHighlights = [];
+        this.validActionTiles = [];
+        this.turnOrder = [];
         this.animTiles = [];
         this.animObjects = [];
+
+        this.easystar = null;
+        this.activePlayerUnit = null;
+
+        if (this.hoverIndicator) this.hoverIndicator.destroy();
+        this.hoverIndicator = null;
+        if (this.selectedUnitIndicator) this.selectedUnitIndicator.destroy();
+        this.selectedUnitIndicator = null;
+
+        this.turnIndex = 0;
+        this.playerActionState = null;
+        this.isMoving = false;
+        this.isMiddleButtonDown = false;
+        this.lastCameraX = 0;
+        this.lastCameraY = 0;
+        this.lastPointerX = 0;
+        this.lastPointerY = 0;
+        // --- END STATE RESET ---
+
+        this.level = this.registry.get('level') || 1;
+
         const battleMap = data.battleMap || testMap;
         const enemyArmy = data.enemyArmy || testArmy;
         const playerArmy = data.playerArmy || defaultArmy;
@@ -68,11 +96,12 @@ export class Game extends Phaser.Scene {
             {x: 3, y: 11}, {x: 4, y: 11}, {x: 2, y: 11}, {x: 5, y: 11},
         ];
 
-        playerArmy.units.forEach((unitType, index) => {
+        playerArmy.units.forEach((unitData, index) => {
             if (index < playerSpawnPoints.length) {
                 combinedObjects.push({
                     type: 'unit',
-                    unitType: unitType,
+                    unitType: unitData.unitName,
+                    rarity: unitData.rarity,
                     position: playerSpawnPoints[index]
                 });
             }
@@ -83,11 +112,14 @@ export class Game extends Phaser.Scene {
             {x: 3, y: 2}, {x: 4, y: 2}, {x: 2, y: 2}, {x: 5, y: 2},
         ];
 
-        enemyArmy.units.forEach((unitType, index) => {
+        enemyArmy.units.forEach((unitData, index) => {
             if (index < enemySpawnPoints.length) {
+                const unitType = typeof unitData === 'string' ? unitData : unitData.unitName;
+                const rarity = typeof unitData === 'string' ? 'common' : unitData.rarity;
                 combinedObjects.push({
                     type: 'unit',
                     unitType: unitType,
+                    rarity: rarity,
                     position: enemySpawnPoints[index]
                 });
             }
@@ -245,8 +277,19 @@ export class Game extends Phaser.Scene {
                             name: unitType.name,
                             stats: stats,
                             moves: moves,
-                            isPlayer: unitType.isPlayer
+                            isPlayer: unitType.isPlayer,
+                            rarity: obj.rarity 
                         });
+
+                        // Add rarity glow
+                        if (unit.rarity === 'rare') {
+                            unit.sprite.postFX.addGlow(0x0000ff, 2, 0, false, 0.1, 10);
+                        } else if (unit.rarity === 'epic') {
+                            unit.sprite.postFX.addGlow(0x9400D3, 2, 0, false, 0.1, 10);
+                        } else if (unit.rarity === 'legendary') {
+                            unit.sprite.postFX.addGlow(0xffd700, 2, 0, false, 0.1, 10);
+                        }
+
                         this.units.push(unit);
                         if (unit.isPlayer) {
                             this.playerUnits.push(unit);
@@ -318,6 +361,11 @@ export class Game extends Phaser.Scene {
         // This ensures they don't appear floating in the air before the unit drops
         this.units.forEach(u => {
             if (u.healthBar) u.healthBar.visible = false;
+        });
+
+        // Set all units as obstacles for pathfinding
+        this.units.forEach(unit => {
+            this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
         });
 
 
@@ -603,7 +651,8 @@ export class Game extends Phaser.Scene {
         this.activePlayerUnit.usedStandardAction = true;
 
         this.activePlayerUnit.attack(targetUnit, () => {
-            targetUnit.heal(move.amount);
+            const healAmount = this.activePlayerUnit.calculateHeal(move);
+            targetUnit.heal(healAmount);
 
             const emitter = this.add.particles(targetUnit.sprite.x, targetUnit.sprite.y, 'particle', {
                 speed: {min: 20, max: 40},
@@ -684,7 +733,7 @@ export class Game extends Phaser.Scene {
                 }
 
                 const onHit = (target) => {
-                    const damageInfo = this.activePlayerUnit.calculateDamage(target);
+                    const damageInfo = this.activePlayerUnit.calculateDamage(target, move);
                     target.takeDamage(damageInfo, this.activePlayerUnit, move);
                 };
 
@@ -746,7 +795,7 @@ export class Game extends Phaser.Scene {
             // Reset flipX after attack animation (assuming default is facing right)
             playerUnit.sprite.flipX = false;
 
-            const damageInfo = playerUnit.calculateDamage(targetUnit);
+            const damageInfo = playerUnit.calculateDamage(targetUnit, move);
             targetUnit.takeDamage(damageInfo, playerUnit, move);
             if(move.status){
                 targetUnit.addStatusEffect(move.status);
@@ -1045,12 +1094,6 @@ export class Game extends Phaser.Scene {
         }
         this.clearHighlights();
 
-        this.units.forEach(otherUnit => {
-            if (otherUnit !== unit) {
-                this.easystar.avoidAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
-            }
-        });
-
         this.easystar.findPath(unit.gridPos.x, unit.gridPos.y, targetX, targetY, (path) => {
             if (path && path.length > 1) {
                 const truncatedPath = path.slice(0, Math.min(path.length, unit.stats.moveRange + 1));
@@ -1058,12 +1101,6 @@ export class Game extends Phaser.Scene {
             } else {
                 console.log("Path was not found or is too short.");
             }
-
-            this.units.forEach(otherUnit => {
-                if (otherUnit !== unit) {
-                    this.easystar.stopAvoidingAdditionalPoint(otherUnit.gridPos.x, otherUnit.gridPos.y);
-                }
-            });
         });
         this.easystar.calculate();
     }
@@ -1073,6 +1110,8 @@ export class Game extends Phaser.Scene {
             if (onCompleteCallback) onCompleteCallback();
             return;
         }
+
+        this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
 
         unit.stopIdle();
 
@@ -1144,6 +1183,7 @@ export class Game extends Phaser.Scene {
                 const lastPos = path[path.length - 1];
                 unit.gridPos.x = lastPos.x;
                 unit.gridPos.y = lastPos.y;
+                this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
                 this.isMoving = false;
 
                 // --- NEW: Turn off Moving Flag ---
@@ -1544,122 +1584,175 @@ export class Game extends Phaser.Scene {
     }
 
     takeEnemyTurn(enemy, onTurnComplete) {
-        const attackMove = enemy.moves.find(m => m.type === 'attack');
-
-        // Helper to calculate Manhattan distance
         const getDist = (a, b) => Math.abs(a.gridPos.x - b.gridPos.x) + Math.abs(a.gridPos.y - b.gridPos.y);
 
-        // 1. ATTACK IF ALREADY IN RANGE
-        const unitsInRange = this.playerUnits.filter(p => getDist(enemy, p) <= attackMove.range);
+        // --- Identify Moves ---
+        const healMove = enemy.moves.find(m => m.type === 'basic_heal');
+        const rangedAttack = enemy.moves.find(m => ['arrow_attack', 'fireball', 'freeze_ball'].includes(m.type));
+        const basicAttack = enemy.moves.find(m => m.type === 'attack');
+        
+        // --- 1. Healer Logic ---
+        if (healMove) {
+            const allies = this.units.filter(u => !u.isPlayer && u !== enemy);
+            const woundedAllies = allies.filter(a => a.stats.currentHealth / a.stats.maxHealth < 0.7);
+            if (woundedAllies.length > 0) {
+                woundedAllies.sort((a, b) => (a.stats.currentHealth / a.stats.maxHealth) - (b.stats.currentHealth / b.stats.maxHealth));
+                const targetAlly = woundedAllies[0];
+                if (getDist(enemy, targetAlly) <= healMove.range) {
+                    this.performEnemyHeal(enemy, targetAlly, healMove, onTurnComplete);
+                    return;
+                }
+            }
+        }
 
-        if (unitsInRange.length > 0) {
-            unitsInRange.sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
-            this.performEnemyAttack(enemy, unitsInRange[0], attackMove, onTurnComplete);
+        const potentialTargets = this.playerUnits.filter(p => p.stats.currentHealth > 0).sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
+        if (potentialTargets.length === 0) {
+            onTurnComplete();
             return;
         }
 
-        // 2. IDENTIFY ALL BLOCKED TILES (Units + Scenery)
-        // This is the specific fix: We map Scenery objects to coordinates just like we do for Units.
-        const blockedCoords = new Set();
+        // --- 2. Ranged Attack Logic ---
+        if (rangedAttack) {
+            // a) Can I attack from here?
+            const targetInRange = potentialTargets.find(p => getDist(enemy, p) <= rangedAttack.range);
+            if (targetInRange) {
+                this.performEnemyAttack(enemy, targetInRange, rangedAttack, onTurnComplete);
+                return;
+            }
 
-        // Add all Units (except self)
+            // b) Find best kiting position
+            let bestMove = { tile: null, target: null, dist: -1 };
+            const allPlayerPositions = this.playerUnits.map(p => p.gridPos);
+            const allWalkableTiles = this.getAllWalkableTilesInRange(enemy.gridPos, enemy.stats.moveRange);
+
+            for (const tile of allWalkableTiles) {
+                for (const target of potentialTargets) {
+                    if (Math.abs(tile.x - target.gridPos.x) + Math.abs(tile.y - target.gridPos.y) <= rangedAttack.range) {
+                        const distToNearestPlayer = Math.min(...allPlayerPositions.map(p => Math.abs(tile.x - p.x) + Math.abs(tile.y - p.y)));
+                        if (distToNearestPlayer > bestMove.dist) {
+                            bestMove = { tile, target, dist: distToNearestPlayer };
+                        }
+                    }
+                }
+            }
+            if (bestMove.tile) {
+                this.executeEnemyMove(enemy, bestMove.tile.x, bestMove.tile.y, () => {
+                    this.performEnemyAttack(enemy, bestMove.target, rangedAttack, onTurnComplete);
+                });
+                return;
+            }
+        }
+        
+        // --- 3. Melee Attack / Fallback Move ---
+        if (basicAttack) {
+            const unitsInMeleeRange = potentialTargets.filter(p => getDist(enemy, p) <= basicAttack.range);
+            if (unitsInMeleeRange.length > 0) {
+                this.performEnemyAttack(enemy, unitsInMeleeRange[0], basicAttack, onTurnComplete);
+                return;
+            }
+        }
+        
+        // Find a valid adjacent tile to the closest target
+        const closestTarget = potentialTargets[0];
+        const blockedCoords = new Set();
         this.units.forEach(u => {
             if (u !== enemy) blockedCoords.add(`${u.gridPos.x},${u.gridPos.y}`);
         });
-
-        // Add all Scenery (Trees, Rocks, etc.)
-        // Note: If you have Chests or NPCs that block movement, add them here too!
         this.sceneryObjects.forEach(s => {
             blockedCoords.add(`${s.gridPos.x},${s.gridPos.y}`);
         });
 
-        // 3. FIND A MOVEMENT TARGET
-        const potentialTargets = [...this.playerUnits].sort((a, b) => getDist(enemy, a) - getDist(enemy, b));
+        const neighbors = [
+            {x: closestTarget.gridPos.x + 1, y: closestTarget.gridPos.y},
+            {x: closestTarget.gridPos.x - 1, y: closestTarget.gridPos.y},
+            {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y + 1},
+            {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y - 1}
+        ];
 
-        let chosenTarget = null;
-        let bestMoveTile = null;
+        const validAttackSpots = neighbors.filter(pos => {
+            if (pos.x < 0 || pos.x >= this.mapConsts.MAP_SIZE_X || pos.y < 0 || pos.y >= this.mapConsts.MAP_SIZE_Y) return false;
+            const isGroundWalkable = this.walkableTiles.includes(this.grid[pos.y][pos.x]);
+            const isBlocked = blockedCoords.has(`${pos.x},${pos.y}`);
+            return isGroundWalkable && !isBlocked;
+        });
 
-        for (const target of potentialTargets) {
-            const neighbors = [
-                {x: target.gridPos.x + 1, y: target.gridPos.y},
-                {x: target.gridPos.x - 1, y: target.gridPos.y},
-                {x: target.gridPos.x, y: target.gridPos.y + 1},
-                {x: target.gridPos.x, y: target.gridPos.y - 1}
-            ];
-
-            const validAttackSpots = neighbors.filter(pos => {
-                // 1. Check Bounds
-                if (pos.x < 0 || pos.x >= this.mapConsts.MAP_SIZE_X ||
-                    pos.y < 0 || pos.y >= this.mapConsts.MAP_SIZE_Y) return false;
-
-                // 2. Check Ground Type (Grass/Mud etc)
-                const isGroundWalkable = this.walkableTiles.includes(this.grid[pos.y][pos.x]);
-
-                // 3. Check for Obstacles (Units AND Scenery)
-                const isBlocked = blockedCoords.has(`${pos.x},${pos.y}`);
-
-                return isGroundWalkable && !isBlocked;
-            });
-
-            if (validAttackSpots.length > 0) {
-                chosenTarget = target;
-
-                // Sort spots by distance to enemy to minimize movement
-                validAttackSpots.sort((a, b) => {
-                    const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
-                    const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
-                    return distA - distB;
-                });
-
-                bestMoveTile = validAttackSpots[0];
-                break;
-            }
-        }
-
-        // 4. EXECUTE MOVEMENT
-        if (chosenTarget && bestMoveTile) {
+        if (validAttackSpots.length > 0) {
+            validAttackSpots.sort((a, b) => getDist({gridPos: a}, enemy) - getDist({gridPos: b}, enemy));
+            const bestMoveTile = validAttackSpots[0];
             this.executeEnemyMove(enemy, bestMoveTile.x, bestMoveTile.y, () => {
-                if (getDist(enemy, chosenTarget) <= attackMove.range) {
-                    this.performEnemyAttack(enemy, chosenTarget, attackMove, onTurnComplete);
+                const attackMove = basicAttack || rangedAttack;
+                if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
+                    this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
                 } else {
                     onTurnComplete();
                 }
             });
-        } else {
-            // Fallback: If all targets are physically surrounded (by units or trees),
-            // just move towards the closest player to apply pressure.
-            if (potentialTargets.length > 0) {
-                const fallback = potentialTargets[0];
-                this.executeEnemyMove(enemy, fallback.gridPos.x, fallback.gridPos.y, onTurnComplete);
-            } else {
-                onTurnComplete();
+            return;
+        }
+
+        // --- 4. No Action Possible ---
+        onTurnComplete();
+    }    getAllWalkableTilesInRange(startPos, range) {
+        const tiles = [];
+        const openList = [{ pos: startPos, cost: 0 }];
+        const closedList = new Set([`${startPos.x},${startPos.y}`]);
+        const allOtherUnits = this.units.map(u => `${u.gridPos.x},${u.gridPos.y}`);
+
+        while(openList.length > 0) {
+            const current = openList.shift();
+            if (current.cost < range) {
+                const neighbors = [
+                    { x: current.pos.x + 1, y: current.pos.y }, { x: current.pos.x - 1, y: current.pos.y },
+                    { x: current.pos.x, y: current.pos.y + 1 }, { x: current.pos.x, y: current.pos.y - 1 }
+                ];
+                for (const neighbor of neighbors) {
+                    const posKey = `${neighbor.x},${neighbor.y}`;
+                    if (!closedList.has(posKey) &&
+                        neighbor.x >= 0 && neighbor.x < this.mapConsts.MAP_SIZE_X &&
+                        neighbor.y >= 0 && neighbor.y < this.mapConsts.MAP_SIZE_Y &&
+                        this.walkableTiles.includes(this.grid[neighbor.y][neighbor.x]) &&
+                        !allOtherUnits.includes(posKey)
+                    ) {
+                        closedList.add(posKey);
+                        tiles.push(neighbor);
+                        openList.push({ pos: neighbor, cost: current.cost + 1 });
+                    }
+                }
             }
         }
+        return tiles;
+    }
+
+    performEnemyHeal(enemy, target, healMove, callback) {
+        // Similar to performEnemyAttack but for healing
+        enemy.attack(target, () => { // Using attack animation for visual feedback
+            const healAmount = enemy.calculateHeal(healMove);
+            target.heal(healAmount);
+            const emitter = this.add.particles(target.sprite.x, target.sprite.y, 'particle', {
+                speed: {min: 20, max: 40},
+                angle: {min: 0, max: 360},
+                scale: {start: 4, end: 0},
+                alpha: {start: 0.6, end: 0},
+                lifespan: 1000,
+                tint: [0x00ff00, 0x00bf00],
+                emitting: false
+            });
+            emitter.setDepth(99999);
+            emitter.explode(20);
+            this.time.delayedCall(1000, () => emitter.destroy());
+            this.time.delayedCall(300, callback);
+        });
     }
 
     // --- Helper: Refactored Move Logic ---
     executeEnemyMove(enemy, targetX, targetY, callback) {
-        // Setup avoidance
-        this.units.forEach(unit => {
-            if (unit !== enemy) {
-                this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
-            }
-        });
-
         this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, targetX, targetY, (path) => {
-            // Cleanup avoidance immediately
-            this.units.forEach(unit => {
-                if (unit !== enemy) {
-                    this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
-                }
-            });
-
             if (path && path.length > 1) {
                 const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
                 this.moveCharacterAlongPath(enemy, truncatedPath, callback);
             } else {
                 // No path found (or start == end)
-                callback();
+                if (callback) callback();
             }
         });
         this.easystar.calculate();
@@ -1670,19 +1763,45 @@ export class Game extends Phaser.Scene {
         // Face the target
         const dx = target.gridPos.x - enemy.gridPos.x;
         // Simple flip logic (assuming right-facing sprite)
-        enemy.sprite.flipX = dx < 0;
+        if (dx !== 0) { // a flip is not needed if the target is on the same column
+            enemy.sprite.flipX = dx < 0;
+        }
 
-        enemy.attack(target, () => {
-            enemy.sprite.flipX = false; // Reset orientation
-            const damageInfo = enemy.calculateDamage(target);
+
+        const onHit = () => {
+            if (dx !== 0) {
+               enemy.sprite.flipX = false; // Reset orientation
+            }
+            const damageInfo = enemy.calculateDamage(target, attackMove);
             target.takeDamage(damageInfo, enemy, attackMove);
-
-            // Add a small delay for visual pacing
+             if(attackMove.status){
+                target.addStatusEffect(attackMove.status);
+            }
             this.time.delayedCall(300, callback);
-        });
+        };
+
+        if (attackMove.type === 'arrow_attack' || attackMove.type === 'fireball' || attackMove.type === 'freeze_ball') {
+             enemy.attack(target, () => {
+                const projectileKey = attackMove.type.replace('_attack', '_projectile').replace('_ball', '_ball_projectile');
+                const projectile = new Projectile(
+                    this,
+                    enemy.sprite.x,
+                    enemy.sprite.y - 24,
+                    ASSETS.image[projectileKey].key,
+                    target.sprite,
+                    onHit
+                );
+                projectile.setDepth(9999);
+            });
+        }
+        else {
+             enemy.attack(target, onHit);
+        }
     }
 
     onUnitDied(unit) {
+        this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+
         if (unit.isPlayer) {
             const playerUnitIndex = this.playerUnits.indexOf(unit);
             if (playerUnitIndex > -1) {
@@ -1693,6 +1812,26 @@ export class Game extends Phaser.Scene {
                 this.scene.stop('ActionUI');
                 this.scene.stop('TimelineUI');
                 this.scene.start('GameOver');
+                return;
+            }
+        } else {
+            // It's an enemy unit
+            const enemyUnitsLeft = this.units.filter(u => !u.isPlayer && u !== unit);
+            if (enemyUnitsLeft.length === 0) {
+                // VICTORY!
+                this.scene.stop('ActionUI');
+                this.scene.stop('TimelineUI');
+                
+                const newLevel = this.level + 1;
+                this.registry.set('level', newLevel);
+                this.registry.set('shopRefreshes', 1); // Grant 1 refresh
+
+                if (newLevel > 10) {
+                    // TODO: Implement a proper "You Win The Game" scene
+                    this.scene.start('MainMenu');
+                } else {
+                    this.scene.start('SquadUpgrade');
+                }
                 return;
             }
         }
@@ -1717,7 +1856,7 @@ export class Game extends Phaser.Scene {
 
             if (pointer.rightButtonDown()) {
                 pointer.event.stopPropagation();
-                // ... (tooltip logic unchanged) ...
+                this.events.emit('unit_right_clicked', unit);
                 return;
             }
 

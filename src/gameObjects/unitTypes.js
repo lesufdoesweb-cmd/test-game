@@ -6,6 +6,7 @@ export const UNIT_TYPES = {
         name: 'Archer',
         isPlayer: true,
         textureKey: 'archer',
+        rarity: 'common',
         stats: {
             maxHealth: 80,
             currentHealth: 80,
@@ -22,6 +23,7 @@ export const UNIT_TYPES = {
         name: 'Orc',
         isPlayer: false,
         textureKey: 'ork',
+        rarity: 'common',
         stats: {
             maxHealth: 100,
             currentHealth: 100,
@@ -38,6 +40,7 @@ export const UNIT_TYPES = {
         name: 'Spider',
         isPlayer: false,
         textureKey: 'spider',
+        rarity: 'common',
         stats: {
             maxHealth: 60,
             currentHealth: 60,
@@ -54,6 +57,7 @@ export const UNIT_TYPES = {
         name: 'Knight',
         isPlayer: true,
         textureKey: 'knight',
+        rarity: 'common',
         stats: {
             maxHealth: 150,
             currentHealth: 150,
@@ -70,6 +74,7 @@ export const UNIT_TYPES = {
         name: 'Paladin',
         isPlayer: true,
         textureKey: 'paladin',
+        rarity: 'common',
         stats: {
             maxHealth: 180,
             currentHealth: 180,
@@ -86,6 +91,7 @@ export const UNIT_TYPES = {
         name: 'Wizard',
         isPlayer: true,
         textureKey: 'wizard',
+        rarity: 'common',
         stats: {
             maxHealth: 70,
             currentHealth: 70,
