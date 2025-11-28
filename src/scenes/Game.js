@@ -577,7 +577,7 @@ export class Game extends Phaser.Scene {
         // Disable the browser's context menu on right-click
         this.input.mouse.disableContextMenu();
 
-        this.cameras.main.postFX.addVignette(0.5, 0.5, 0.98, 0.4);
+    //    this.vignette = this.cameras.main.postFX.addVignette(0.5, 0.5, 0.98, 0.4);
 
         // --- RESTORED: Trigger Entrance Animation ---
         this.animateSceneEntry();
@@ -1585,131 +1585,123 @@ export class Game extends Phaser.Scene {
     takeEnemyTurn(enemy, onTurnComplete) {
         const getDist = (a, b) => Math.abs(a.gridPos.x - b.gridPos.x) + Math.abs(a.gridPos.y - b.gridPos.y);
 
-        // --- 1. Identify Valid Targets ---
-        // Filter out dead units
-        const potentialTargets = this.playerUnits.filter(p => p.stats.currentHealth > 0);
+        // 1. Find attack move
+        const attackMove = enemy.moves.find(m => ['attack', 'arrow_attack', 'fireball', 'freeze_ball'].includes(m.type));
+        if (!attackMove) {
+            onTurnComplete(); // No attack, do nothing
+            return;
+        }
 
-        // Sort by health (weakest first) or distance
-        potentialTargets.sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
+        // 2. Find all potential targets, sorted by distance
+        const potentialTargets = this.playerUnits
+            .filter(p => p.stats.currentHealth > 0)
+            .sort((a, b) => getDist(enemy, a) - getDist(enemy, b));
 
         if (potentialTargets.length === 0) {
             onTurnComplete();
             return;
         }
 
-        const closestTarget = potentialTargets[0]; // Simplification: focus on one target
-
-        // --- 2. Check for Attack Opportunity (Standing Still) ---
-        // Can I attack anyone from where I am right now?
-        const attackMove = enemy.moves.find(m => ['attack', 'arrow_attack', 'fireball', 'freeze_ball'].includes(m.type));
-        if (attackMove) {
-            const targetInRange = potentialTargets.find(p => getDist(enemy, p) <= attackMove.range);
-            if (targetInRange) {
-                this.performEnemyAttack(enemy, targetInRange, attackMove, onTurnComplete);
+        // 3. If a target is already in range, attack it. Attack closest one first.
+        for (const target of potentialTargets) {
+            if (getDist(enemy, target) <= attackMove.range) {
+                this.performEnemyAttack(enemy, target, attackMove, onTurnComplete);
                 return;
             }
         }
 
-        const isRanged = attackMove && attackMove.range > 1;
-
-        if (isRanged) {
-            // For ranged units, just move towards the target to get in range.
-            this.easystar.stopAvoidingAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y);
-            this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, closestTarget.gridPos.x, closestTarget.gridPos.y, (path) => {
-                this.easystar.avoidAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y); // Restore avoidance
-
-                if (path && path.length > 2) { // Need at least start, one step, and target
-                    const pathToFollow = path.slice(0, path.length - 1); // Exclude target's tile
-                    const truncatedPath = pathToFollow.slice(0, Math.min(pathToFollow.length, enemy.stats.moveRange + 1));
-
-                    this.moveCharacterAlongPath(enemy, truncatedPath, () => {
-                        // After moving, check again if can attack.
-                        if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
-                            this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
-                        } else {
-                            onTurnComplete();
-                        }
-                    });
-                } else {
-                    // No path or path is too short to move.
-                    onTurnComplete();
-                }
-            });
-            this.easystar.calculate();
-            return;
-        }
-        
-        // --- 3. Find Best Movement Tile for Melee ---
-        const targetNeighbors = [
-            {x: closestTarget.gridPos.x + 1, y: closestTarget.gridPos.y},
-            {x: closestTarget.gridPos.x - 1, y: closestTarget.gridPos.y},
-            {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y + 1},
-            {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y - 1}
-        ];
-        const validDestinations = targetNeighbors.filter(pos => this.isTileFree(pos.x, pos.y));
-        if (validDestinations.length === 0) {
-            // Fallback: No adjacent spot is free. Move towards the player anyway.
-            this.easystar.stopAvoidingAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y);
-            this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, closestTarget.gridPos.x, closestTarget.gridPos.y, (path) => {
-                this.easystar.avoidAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y); // Restore avoidance
-
-                if (path && path.length > 2) { // Need at least start, one step, and target
-                    const pathToFollow = path.slice(0, path.length - 1); // Exclude target's tile
-                    const truncatedPath = pathToFollow.slice(0, Math.min(pathToFollow.length, enemy.stats.moveRange + 1));
-
-                    this.moveCharacterAlongPath(enemy, truncatedPath, () => {
-                        // After moving, check again if can attack.
-                        if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
-                            this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
-                        } else {
-                            onTurnComplete();
-                        }
-                    });
-                } else {
-                    // No path or path is too short to move.
-                    onTurnComplete();
-                }
-            });
-            this.easystar.calculate();
-            return;
-        }
-
-        // Sort destinations by distance to the enemy (find the closest one to me)
-        validDestinations.sort((a, b) => {
-            const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
-            const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
-            return distA - distB;
-        });
-
-        const chosenTile = validDestinations[0];
-
-        // --- 4. Execute Move ---
-        // We use EasyStar to find the path to that specific open tile
-        this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, chosenTile.x, chosenTile.y, (path) => {
-            if (path && path.length > 1) {
-                const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
-
-                // Double check the end of the path is still free (paranoid check)
-                const dest = truncatedPath[truncatedPath.length-1];
-                if (!this.isTileFree(dest.x, dest.y)) {
-                    onTurnComplete();
-                    return;
-                }
-
-                this.moveCharacterAlongPath(enemy, truncatedPath, () => {
-                    // Turn finished moving, now try to attack
-                    if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
-                        this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
-                    } else {
-                        onTurnComplete();
-                    }
-                });
-            } else {
-                // No path found
-                onTurnComplete();
+        // 4. No target in range, so we need to move. Find the best tile to move to.
+        const planner = new EasyStar.js();
+        planner.setGrid(this.grid);
+        planner.setAcceptableTiles(this.walkableTiles);
+        this.units.forEach(u => {
+            if (u !== enemy) { // Block pathing through any other unit
+                planner.avoidAdditionalPoint(u.gridPos.x, u.gridPos.y);
             }
         });
-        this.easystar.calculate();
+        this.sceneryObjects.forEach(s => planner.avoidAdditionalPoint(s.gridPos.x, s.gridPos.y));
+
+        let possibleMoves = [];
+
+        // Find all reachable tiles within move range
+        const reachableTiles = this.getAllWalkableTilesInRange(enemy.gridPos, enemy.stats.moveRange)
+            .filter(tile => !this.getUnitAtGridPos(tile)); // Filter out occupied tiles
+
+        // For each reachable tile, check if it's an attack position
+        for(const tile of reachableTiles) {
+            for(const target of potentialTargets) {
+                if (getDist({gridPos: tile}, target) <= attackMove.range) {
+                    possibleMoves.push({ destination: tile, target: target });
+                    // We only need one target per tile, preferably the closest
+                    break; 
+                }
+            }
+        }
+
+        if (possibleMoves.length > 0) {
+            // We can move and attack this turn. Find the best move.
+            // Best = move to a spot to attack the closest possible target
+            possibleMoves.sort((a, b) => {
+                const distToTargetA = getDist(enemy, a.target);
+                const distToTargetB = getDist(enemy, b.target);
+                return distToTargetA - distToTargetB;
+            });
+            
+            const bestTarget = possibleMoves[0].target;
+            const finalDestinations = possibleMoves
+                .filter(m => m.target === bestTarget)
+                .sort((a,b) => getDist(enemy, {gridPos: a.destination}) - getDist(enemy, {gridPos: b.destination}));
+
+            const bestDestination = finalDestinations[0].destination;
+            
+            planner.findPath(enemy.gridPos.x, enemy.gridPos.y, bestDestination.x, bestDestination.y, (path) => {
+                if (path && path.length > 1) {
+                    this.moveCharacterAlongPath(enemy, path, () => {
+                        this.performEnemyAttack(enemy, bestTarget, attackMove, onTurnComplete);
+                    });
+                } else {
+                    // Path is blocked, fallback
+                    this.executeFallbackMove(enemy, potentialTargets[0], planner, onTurnComplete);
+                }
+            });
+
+        } else {
+            // Cannot attack this turn. Fallback to moving towards the closest enemy.
+            this.executeFallbackMove(enemy, potentialTargets[0], planner, onTurnComplete);
+        }
+
+        planner.calculate();
+    }
+
+    executeFallbackMove(enemy, target, planner, onTurnComplete) {
+         // Path to the tile *next to* the target, not on it.
+         const targetNeighbors = [
+            {x: target.gridPos.x + 1, y: target.gridPos.y},
+            {x: target.gridPos.x - 1, y: target.gridPos.y},
+            {x: target.gridPos.x, y: target.gridPos.y + 1},
+            {x: target.gridPos.x, y: target.gridPos.y - 1}
+        ].filter(pos => 
+            pos.x >= 0 && pos.x < this.mapConsts.MAP_SIZE_X &&
+            pos.y >= 0 && pos.y < this.mapConsts.MAP_SIZE_Y &&
+            this.walkableTiles.includes(this.grid[pos.y][pos.x]) &&
+            !this.getUnitAtGridPos(pos)
+        ).sort((a,b) => {
+            const getDist = (p1, p2) => Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
+            return getDist(enemy.gridPos, a) - getDist(enemy.gridPos, b);
+        });
+
+        if (targetNeighbors.length > 0) {
+            planner.findPath(enemy.gridPos.x, enemy.gridPos.y, targetNeighbors[0].x, targetNeighbors[0].y, (path) => {
+                if (path && path.length > 1) {
+                    const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
+                    this.moveCharacterAlongPath(enemy, truncatedPath, onTurnComplete);
+                } else {
+                    onTurnComplete(); // No path
+                }
+            });
+        } else {
+             onTurnComplete(); // Target is fully surrounded
+        }
     }
     getAllWalkableTilesInRange(startPos, range) {
         const tiles = [];
@@ -1931,5 +1923,79 @@ export class Game extends Phaser.Scene {
                 unit.startIdle();
             }
         });
+    }
+
+    shutdown() {
+        console.log('Game scene shutdown initiated.');
+
+        // Destroy all game objects
+        this.units.forEach(unit => unit.destroy());
+        this.sceneryObjects.forEach(scenery => scenery.sprite.destroy());
+        this.traps.forEach(trap => {
+            // Assuming Trap class has a destroy method, or direct sprite access
+            if (trap.destroy) trap.destroy();
+            else if (trap.sprite) trap.sprite.destroy();
+        });
+        this.rangeHighlights.forEach(highlight => highlight.destroy());
+        this.animTiles.forEach(tile => tile.destroy());
+        this.animObjects.forEach(obj => obj.destroy());
+
+        if (this.hoverIndicator) this.hoverIndicator.destroy();
+        if (this.selectedUnitIndicator) this.selectedUnitIndicator.destroy();
+
+        // Stop all tweens associated with this scene
+        this.tweens.killTweensOf(this); // Kills the hoverAnimY tween
+        if (this.activeUnitTween) {
+            this.activeUnitTween.stop();
+            this.activeUnitTween = null;
+        }
+
+        // Remove camera PostFX (vignette)
+        if (this.vignette) {
+            this.cameras.main.postFX.remove(this.vignette);
+            this.vignette = null;
+        }
+
+        // Remove all event listeners
+        this.events.off('unit_stats_changed');
+        this.events.off('action_selected', this.onActionSelected, this);
+        this.events.off('unit_died', this.onUnitDied, this);
+        this.events.off('action_cancelled', this.cancelPlayerAction, this);
+        this.events.off('skip_turn', this.endFullPlayerTurn, this);
+        this.events.off('unit_damaged');
+        
+        // Remove input event listeners
+        this.input.off('pointerdown');
+        this.input.off('pointermove');
+        this.input.off('pointerup');
+
+        // Clear arrays and reset state variables
+        this.playerUnits = [];
+        this.units = [];
+        this.sceneryObjects = [];
+        this.traps = [];
+        this.grid = [];
+        this.rangeHighlights = [];
+        this.validActionTiles = [];
+        this.turnOrder = [];
+        this.animTiles = [];
+        this.animObjects = [];
+
+        this.easystar = null;
+        this.activePlayerUnit = null;
+        this.hoverIndicator = null;
+        this.selectedUnitIndicator = null;
+        this.activeUnitTween = null;
+
+        this.turnIndex = 0;
+        this.playerActionState = null;
+        this.isMoving = false;
+        this.isMiddleButtonDown = false;
+        this.lastCameraX = 0;
+        this.lastCameraY = 0;
+        this.lastPointerX = 0;
+        this.lastPointerY = 0;
+
+        console.log('Game scene shutdown complete.');
     }
 }
