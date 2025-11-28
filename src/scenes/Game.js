@@ -1260,7 +1260,9 @@ export class Game extends Phaser.Scene {
     }
 
     buildTurnOrder() {
-        this.turnOrder = [...this.units].sort((a, b) => b.stats.speed - a.stats.speed);
+        const playerUnits = this.units.filter(unit => unit.isPlayer);
+        const enemyUnits = this.units.filter(unit => !unit.isPlayer);
+        this.turnOrder = [...playerUnits, ...enemyUnits];
     }
 
     updateCooldowns(unit) {
@@ -1817,6 +1819,9 @@ export class Game extends Phaser.Scene {
     }
 
     onUnitDied(unit) {
+        // --- FIX: Keep track of whose turn it is ---
+        const currentTurnUnit = this.turnOrder.length > this.turnIndex ? this.turnOrder[this.turnIndex] : null;
+
         this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
 
         if (unit.isPlayer) {
@@ -1858,10 +1863,19 @@ export class Game extends Phaser.Scene {
             this.units.splice(unitIndex, 1);
         }
 
+        const deadUnitIndexInTurnOrder = this.turnOrder.indexOf(unit);
         this.buildTurnOrder();
+        
+        if (currentTurnUnit === unit) {
+            this.turnIndex = deadUnitIndexInTurnOrder;
+        } else if (currentTurnUnit) {
+            this.turnIndex = this.turnOrder.indexOf(currentTurnUnit);
+        }
+
         if (this.turnIndex >= this.turnOrder.length) {
             this.turnIndex = 0;
         }
+
         this.events.emit('turn_changed', this.turnIndex);
     }
 

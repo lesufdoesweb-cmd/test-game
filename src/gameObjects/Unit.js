@@ -157,16 +157,22 @@ export class Unit {
     }
 
     stopIdle() {
-        if (this.idleTween) {
-            this.idleTween.stop();
-            this.idleTween = null;
+        if (this.sprite) {
+            this.scene.tweens.killTweensOf(this.sprite);
         }
+        if (this.shadow) {
+            this.scene.tweens.killTweensOf(this.shadow);
+        }
+        this.idleTween = null;
 
         // Reset to floor immediately
         if (this.sprite && this.sprite.active) {
             const originalY = this.sprite.getData('originalY');
             if (originalY !== undefined) {
                 this.sprite.y = originalY;
+                if (this.shadow) {
+                    this.shadow.y = this.sprite.getData('originalY') || this.sprite.y;
+                }
             }
         }
     }
