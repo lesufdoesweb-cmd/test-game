@@ -84,12 +84,15 @@ export class Game extends Phaser.Scene {
 
         this.level = this.registry.get('level') || 1;
 
-        const battleMap = data.battleMap || testMap;
-        const enemyArmy = data.enemyArmy || testArmy;
-        const playerArmy = data.playerArmy || defaultArmy;
+        // --- FIX STARTS HERE ---
+        // 1. Deep Copy the data. This breaks the link to the original imported files.
+        // If we don't do this, the previous game's modifications persist, causing bugs.
+        const battleMap = JSON.parse(JSON.stringify(data.battleMap || testMap));
+        const enemyArmy = JSON.parse(JSON.stringify(data.enemyArmy || testArmy));
+        const playerArmy = JSON.parse(JSON.stringify(data.playerArmy || defaultArmy));
 
-        // Combine map objects and units into a single list for processing
-        const combinedObjects = [...battleMap.objects];
+        // 2. Use the FRESH battleMap.objects array
+        const combinedObjects = battleMap.objects;
 
         const playerSpawnPoints = [
             {x: 3, y: 10}, {x: 4, y: 10}, {x: 2, y: 10}, {x: 5, y: 10},
@@ -114,13 +117,16 @@ export class Game extends Phaser.Scene {
 
         enemyArmy.units.forEach((unitData, index) => {
             if (index < enemySpawnPoints.length) {
+                // Support both string format and object format for enemies
                 const unitType = typeof unitData === 'string' ? unitData : unitData.unitName;
-                const rarity = typeof unitData === 'string' ? 'common' : unitData.rarity;
+                const rarity = typeof unitData === 'string' ? 'common' : (unitData.rarity || 'common');
+
                 combinedObjects.push({
                     type: 'unit',
                     unitType: unitType,
                     rarity: rarity,
-                    position: enemySpawnPoints[index]
+                    position: enemySpawnPoints[index],
+                    isPlayer: false,
                 });
             }
         });
@@ -129,6 +135,7 @@ export class Game extends Phaser.Scene {
             ...battleMap,
             objects: combinedObjects
         };
+        // --- FIX ENDS HERE ---
 
         const levelData = LevelGenerator.generate(levelConfig);
 
@@ -277,7 +284,7 @@ export class Game extends Phaser.Scene {
                             name: unitType.name,
                             stats: stats,
                             moves: moves,
-                            isPlayer: unitType.isPlayer,
+                            isPlayer: obj.isPlayer !== undefined ? obj.isPlayer : unitType.isPlayer,
                             rarity: obj.rarity 
                         });
 
@@ -576,6 +583,31 @@ export class Game extends Phaser.Scene {
         this.animateSceneEntry();
     }
 
+    isTileFree(x, y) {
+        // 1. Check Bounds
+        if (x < 0 || x >= this.mapConsts.MAP_SIZE_X || y < 0 || y >= this.mapConsts.MAP_SIZE_Y) {
+            return false;
+        }
+
+        // 2. Check Walls/Void (using your grid layout)
+        if (!this.walkableTiles.includes(this.grid[y][x])) {
+            return false;
+        }
+
+        // 3. Check Scenery
+        if (this.sceneryObjects.some(s => s.gridPos.x === x && s.gridPos.y === y)) {
+            return false;
+        }
+
+        // 4. Check Units (Crucial: Checks ALL units, Player AND Enemy)
+        // We act as if every unit is a solid wall
+        if (this.units.some(u => u.gridPos.x === x && u.gridPos.y === y)) {
+            return false;
+        }
+
+        return true;
+    }
+
     // --- RESTORED: Scene Entry Animation Function ---
     animateSceneEntry() {
         const waveSpeed = 60;
@@ -630,13 +662,15 @@ export class Game extends Phaser.Scene {
         const move = this.activeMove;
         if (!move) return;
 
+        this.clearHighlights();
+
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
+        this.activePlayerUnit.usedStandardAction = true;
 
         targetUnit.addStatusEffect({ type: 'armor_up', duration: move.duration, amount: move.amount });
 
-        this.clearHighlights();
         this.playerActionState = 'SELECTING_ACTION';
         this.events.emit('player_action_completed');
     }
@@ -644,6 +678,8 @@ export class Game extends Phaser.Scene {
     performHeal(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
+
+        this.clearHighlights();
 
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
@@ -667,7 +703,6 @@ export class Game extends Phaser.Scene {
             emitter.explode(20);
             this.time.delayedCall(1000, () => emitter.destroy());
 
-            this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
         });
@@ -677,6 +712,8 @@ export class Game extends Phaser.Scene {
         const move = this.activeMove;
         if (!move) return;
 
+        this.clearHighlights();
+
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
         move.currentCooldown = move.cooldown;
@@ -685,96 +722,97 @@ export class Game extends Phaser.Scene {
         const trap = new Trap(this, { gridX: gridPos.x, gridY: gridPos.y });
         this.traps.push(trap);
 
-        this.clearHighlights();
         this.playerActionState = 'SELECTING_ACTION';
         this.events.emit('player_action_completed');
     }
 
-    performArrowRain(gridPos) {
-        const move = this.activeMove;
-        if (!move) return;
-
-        this.activePlayerUnit.stats.currentAp -= move.cost;
-        this.events.emit('unit_stats_changed', this.activePlayerUnit);
-        move.currentCooldown = move.cooldown;
-        this.activePlayerUnit.usedStandardAction = true;
-
-        const playerUnit = this.activePlayerUnit;
-
-        playerUnit.lungeUp(() => {
-            // This is the onImpactCallback of lungeUp
-            // Create 3 arrows shooting upwards
-            for (let i = 0; i < 3; i++) {
-                const projectile = new Projectile(
-                    this,
-                    playerUnit.sprite.x + (i * 10 - 10),
-                    playerUnit.sprite.y - 24,
-                    ASSETS.image.arrow_projectile.key,
-                    { x: playerUnit.sprite.x, y: playerUnit.sprite.y - 400 },
-                    () => {},
-                );
-                projectile.setDepth(9999);
-            }
-
-            // After a delay, start the arrow rain
-            this.time.delayedCall(500, () => {
-                const { width, height } = move.aoe;
-                const enemiesToHit = [];
-
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const tileX = gridPos.x + x;
-                        const tileY = gridPos.y + y;
-                        const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
-                        if (targetUnit && !targetUnit.isPlayer) {
-                            enemiesToHit.push(targetUnit);
+        performArrowRain(gridPos) {
+            const move = this.activeMove;
+            if (!move) return;
+    
+            this.clearHighlights();
+    
+            this.activePlayerUnit.stats.currentAp -= move.cost;
+            this.events.emit('unit_stats_changed', this.activePlayerUnit);
+            move.currentCooldown = move.cooldown;
+            this.activePlayerUnit.usedStandardAction = true;
+    
+            const playerUnit = this.activePlayerUnit;
+    
+            playerUnit.lungeUp(() => {
+                // This is the onImpactCallback of lungeUp
+                // Create 3 arrows shooting upwards
+                for (let i = 0; i < 3; i++) {
+                    const projectile = new Projectile(
+                        this,
+                        playerUnit.sprite.x + (i * 10 - 10),
+                        playerUnit.sprite.y - 24,
+                        ASSETS.image.arrow_projectile.key,
+                        { x: playerUnit.sprite.x, y: playerUnit.sprite.y - 400 },
+                        () => {},
+                    );
+                    projectile.setDepth(9999);
+                }
+    
+                // After a delay, start the arrow rain
+                this.time.delayedCall(500, () => {
+                    const { width, height } = move.aoe;
+                    const enemiesToHit = [];
+    
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const tileX = gridPos.x + x;
+                            const tileY = gridPos.y + y;
+                            const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
+                            if (targetUnit && !targetUnit.isPlayer) {
+                                enemiesToHit.push(targetUnit);
+                            }
                         }
                     }
-                }
-
-                const onHit = (target) => {
-                    const damageInfo = this.activePlayerUnit.calculateDamage(target, move);
-                    target.takeDamage(damageInfo, this.activePlayerUnit, move);
-                };
-
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const tileX = gridPos.x + x;
-                        const tileY = gridPos.y + y;
-
-                        const screenX = this.origin.x + (tileX - tileY) * this.mapConsts.HALF_WIDTH;
-                        const screenY = this.origin.y + (tileX + tileY) * this.mapConsts.QUARTER_HEIGHT;
-
-                        for (let i = 0; i < 3; i++) { // 3 arrows per tile
-                            const projectile = new Projectile(
-                                this,
-                                screenX + Phaser.Math.Between(-10, 10),
-                                screenY - 200, // Start from above the screen
-                                ASSETS.image.arrow_projectile.key,
-                                { x: screenX, y: screenY }, // Target position
-                                () => {
-                                    const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
-                                    if (targetUnit && !targetUnit.isPlayer && enemiesToHit.includes(targetUnit)) {
-                                        onHit(targetUnit);
-                                        enemiesToHit.splice(enemiesToHit.indexOf(targetUnit), 1); // only hit once
+    
+                    const onHit = (target) => {
+                        const damageInfo = this.activePlayerUnit.calculateDamage(target, move);
+                        target.takeDamage(damageInfo, this.activePlayerUnit, move);
+                    };
+    
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const tileX = gridPos.x + x;
+                            const tileY = gridPos.y + y;
+    
+                            const screenX = this.origin.x + (tileX - tileY) * this.mapConsts.HALF_WIDTH;
+                            const screenY = this.origin.y + (tileX + tileY) * this.mapConsts.QUARTER_HEIGHT;
+    
+                            for (let i = 0; i < 3; i++) { // 3 arrows per tile
+                                const projectile = new Projectile(
+                                    this,
+                                    screenX + Phaser.Math.Between(-10, 10),
+                                    screenY - 200, // Start from above the screen
+                                    ASSETS.image.arrow_projectile.key,
+                                    { x: screenX, y: screenY }, // Target position
+                                    () => {
+                                        const targetUnit = this.getUnitAtGridPos({ x: tileX, y: tileY });
+                                        if (targetUnit && !targetUnit.isPlayer && enemiesToHit.includes(targetUnit)) {
+                                            onHit(targetUnit);
+                                            enemiesToHit.splice(enemiesToHit.indexOf(targetUnit), 1); // only hit once
+                                        }
                                     }
-                                }
-                            );
-                            projectile.setDepth(9999);
+                                );
+                                projectile.setDepth(9999);
+                            }
                         }
                     }
-                }
-
-                this.clearHighlights();
-                this.playerActionState = 'SELECTING_ACTION';
-                this.events.emit('player_action_completed');
+    
+                    this.playerActionState = 'SELECTING_ACTION';
+                    this.events.emit('player_action_completed');
+                });
             });
-        });
-    }
-
+        }
     performPlayerAttack(targetUnit) {
         const move = this.activeMove;
         if (!move) return;
+
+        this.clearHighlights();
 
         this.activePlayerUnit.stats.currentAp -= move.cost;
         this.events.emit('unit_stats_changed', this.activePlayerUnit);
@@ -800,7 +838,6 @@ export class Game extends Phaser.Scene {
             if(move.status){
                 targetUnit.addStatusEffect(move.status);
             }
-            this.clearHighlights();
             this.playerActionState = 'SELECTING_ACTION';
             this.events.emit('player_action_completed');
         };
@@ -850,6 +887,16 @@ export class Game extends Phaser.Scene {
         if (this.vignette && this.activePlayerUnit) {
             this.vignette.x = this.activePlayerUnit.sprite.x;
             this.vignette.y = this.activePlayerUnit.sprite.y;
+        }
+
+        // --- NEW: Update selected unit indicator position ---
+        if (this.selectedUnitIndicator && this.activePlayerUnit && this.activePlayerUnit.sprite) {
+            const unitSprite = this.activePlayerUnit.sprite;
+            // The indicator should follow the unit's sprite, with a fixed offset.
+            // The -7 offset was initially applied during creation, so we apply it here too relative to the sprite's current y.
+            this.selectedUnitIndicator.x = unitSprite.x;
+            this.selectedUnitIndicator.y = unitSprite.y - 7;
+            this.selectedUnitIndicator.setDepth(unitSprite.depth - 0.25);
         }
 
         // --- Scenery Transparency Logic ---
@@ -1094,6 +1141,16 @@ export class Game extends Phaser.Scene {
         }
         this.clearHighlights();
 
+        const move = this.activeMove;
+        if (!move) return;
+
+        unit.stats.currentAp -= move.cost;
+        this.events.emit('unit_stats_changed', unit);
+        unit.hasMoved = true;
+
+        this.playerActionState = 'SELECTING_ACTION';
+        this.events.emit('player_action_completed');
+
         this.easystar.findPath(unit.gridPos.x, unit.gridPos.y, targetX, targetY, (path) => {
             if (path && path.length > 1) {
                 const truncatedPath = path.slice(0, Math.min(path.length, unit.stats.moveRange + 1));
@@ -1111,30 +1168,30 @@ export class Game extends Phaser.Scene {
             return;
         }
 
+        // --- KEY FIX: IMMEDIATE RESERVATION ---
+        // 1. Unmark the OLD position in EasyStar immediately
         this.easystar.stopAvoidingAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
 
+        // 2. Identify the Destination
+        const lastPos = path[path.length - 1];
+
+        // 3. LOGICALLY move the unit instantly.
+        // This prevents other units from pathing here while this unit is tweening.
+        unit.gridPos.x = lastPos.x;
+        unit.gridPos.y = lastPos.y;
+
+        // 4. Mark the NEW position in EasyStar immediately
+        this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
+        // --------------------------------------
+
         unit.stopIdle();
-
-        // --- NEW: Set Moving Flag so Healthbar Follows the Jump ---
         unit.isMovingSprite = true;
-
-        // Check for traps along the path
-        for (let i = 1; i < path.length; i++) {
-            const pos = path[i];
-            const trapIndex = this.traps.findIndex(t => t.gridPos.x === pos.x && t.gridPos.y === pos.y);
-            if (trapIndex > -1) {
-                // Found a trap, truncate the path to this point
-                path = path.slice(0, i + 1);
-                break;
-            }
-        }
-
         this.isMoving = true;
-        this.events.emit('unit_is_moving');
-        if (unit.isPlayer) this.events.emit('player_action_selected');
 
+        // Visual Helpers
         unit.sprite.setData('prevX', unit.sprite.x);
 
+        // Prepare Path for Tween
         const screenPath = path.map(pos => ({
             x: this.origin.x + (pos.x - pos.y) * this.mapConsts.HALF_WIDTH,
             y: this.origin.y + (pos.x + pos.y) * this.mapConsts.QUARTER_HEIGHT,
@@ -1145,10 +1202,9 @@ export class Game extends Phaser.Scene {
             movementPath.lineTo(screenPath[i].x, screenPath[i].y);
         }
 
+        // Animation Logic
         const duration = 200 * (path.length - 1);
         const follower = { t: 0, vec: new Phaser.Math.Vector2() };
-        const hopHeight = 8;
-        const totalSteps = path.length - 1;
 
         this.tweens.add({
             targets: follower,
@@ -1157,94 +1213,46 @@ export class Game extends Phaser.Scene {
             ease: 'Linear',
             onUpdate: () => {
                 movementPath.getPoint(follower.t, follower.vec);
-                const hopY = Math.sin(follower.t * totalSteps * Math.PI) * hopHeight;
 
-                unit.sprite.setPosition(follower.vec.x, follower.vec.y - Math.abs(hopY));
+                // Add a little hop effect based on progress
+                const hopHeight = 8;
+                const totalSteps = path.length - 1;
+                // Calculate current step index based on t
+                const currentStep = Math.floor(follower.t * totalSteps);
+                const stepProgress = (follower.t * totalSteps) - currentStep;
+                const hopY = Math.sin(stepProgress * Math.PI) * hopHeight;
 
+                unit.sprite.setPosition(follower.vec.x, follower.vec.y - hopY);
+
+                // Handle Shadow
                 if (unit.shadow) {
                     unit.shadow.setPosition(follower.vec.x, follower.vec.y);
-                    const scaleMod = 1 - (Math.abs(hopY) / 40);
-                    unit.shadow.setScale(scaleMod, -0.5 * scaleMod);
                 }
 
+                // Handle Flip
                 if (unit.sprite.x < unit.sprite.getData('prevX')) {
                     unit.sprite.flipX = true;
-                    if (unit.shadow) unit.shadow.flipX = true;
                 } else if (unit.sprite.x > unit.sprite.getData('prevX')) {
                     unit.sprite.flipX = false;
-                    if (unit.shadow) unit.shadow.flipX = false;
                 }
                 unit.sprite.setData('prevX', unit.sprite.x);
-
                 unit.sprite.setDepth(follower.vec.y);
-                if (unit.shadow) unit.shadow.setDepth(follower.vec.y - 0.1);
             },
             onComplete: () => {
-                const lastPos = path[path.length - 1];
-                unit.gridPos.x = lastPos.x;
-                unit.gridPos.y = lastPos.y;
-                this.easystar.avoidAdditionalPoint(unit.gridPos.x, unit.gridPos.y);
                 this.isMoving = false;
-
-                // --- NEW: Turn off Moving Flag ---
                 unit.isMovingSprite = false;
 
-                // Check for trap at destination
-                const trapIndex = this.traps.findIndex(t => t.gridPos.x === lastPos.x && t.gridPos.y === lastPos.y);
-                if (trapIndex > -1) {
-                    const trap = this.traps[trapIndex];
-                    this.time.delayedCall(100, () => {
-                        trap.trigger(unit);
-                        this.traps.splice(trapIndex, 1);
-                    });
-                }
+                // Snap to final exact screen position
+                const finalScreenY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
+                const finalScreenX = this.origin.x + (lastPos.x - lastPos.y) * this.mapConsts.HALF_WIDTH;
 
-                unit.sprite.setData('prevX', undefined);
-                if (this.activeUnitTween && this.activePlayerUnit === unit) {
-                    this.activeUnitTween.stop();
-                }
-
-                const newOriginalY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
-
-                unit.sprite.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
-                unit.sprite.setData('originalY', newOriginalY);
-
-                if (unit.shadow) {
-                    unit.shadow.setPosition(screenPath[screenPath.length-1].x, newOriginalY);
-                    unit.shadow.setScale(1, -0.5);
-                }
+                unit.sprite.setPosition(finalScreenX, finalScreenY);
+                unit.sprite.setData('originalY', finalScreenY);
+                if(unit.shadow) unit.shadow.setPosition(finalScreenX, finalScreenY);
 
                 unit.startIdle();
 
-                if (this.selectedUnitIndicator && this.activePlayerUnit === unit) {
-                    this.selectedUnitIndicator.destroy();
-                    const screenX = this.origin.x + (lastPos.x - lastPos.y) * this.mapConsts.HALF_WIDTH;
-                    const screenY = this.origin.y + (lastPos.x + lastPos.y) * this.mapConsts.QUARTER_HEIGHT;
-                    this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff);
-                    this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25);
-
-                    this.tweens.add({
-                        targets: this.selectedUnitIndicator,
-                        y: this.selectedUnitIndicator.y - 3,
-                        duration: 500,
-                        ease: 'Sine.easeInOut',
-                        yoyo: true,
-                        repeat: -1,
-                        repeatDelay: 0
-                    });
-                }
-
-                if (unit.isPlayer) {
-                    const move = unit.moves.find(m => m.type === 'move');
-                    if (move) {
-                        unit.stats.currentAp -= move.cost;
-                        move.currentCooldown = move.cooldown;
-                    }
-                    unit.hasMoved = true;
-                    this.events.emit('unit_stats_changed', unit);
-                    this.events.emit('player_action_completed');
-                    this.playerActionState = 'SELECTING_ACTION';
-                }
+                // Trigger traps or events here if needed
 
                 if (onCompleteCallback) onCompleteCallback();
             }
@@ -1345,16 +1353,6 @@ export class Game extends Phaser.Scene {
         const screenY = this.origin.y + (unit.gridPos.x + unit.gridPos.y) * this.mapConsts.QUARTER_HEIGHT;
         this.selectedUnitIndicator = this.createCornerIsometricIndicator(screenX, screenY - 7, 0x0000ff);
         this.selectedUnitIndicator.setDepth(unit.sprite.depth - 0.25);
-
-        this.tweens.add({
-            targets: this.selectedUnitIndicator,
-            y: this.selectedUnitIndicator.y - 3,
-            duration: 500,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1,
-            repeatDelay: 0
-        });
     }
 
     startPlayerUnitTurn(unit) {
@@ -1408,9 +1406,8 @@ export class Game extends Phaser.Scene {
 
     onActionSelected(move) {
         if (move.currentCooldown > 0) return;
-        if (move.type === 'attack' && this.activePlayerUnit.usedStandardAction) return;
-        if (move.type === 'arrow_attack' && this.activePlayerUnit.usedStandardAction) return;
         if (move.type === 'move' && this.activePlayerUnit.hasMoved) return;
+        if (move.type !== 'move' && this.activePlayerUnit.usedStandardAction) return;
         if (this.activePlayerUnit.stats.currentAp < move.cost) return;
 
         this.activeMove = move;
@@ -1586,113 +1583,133 @@ export class Game extends Phaser.Scene {
     takeEnemyTurn(enemy, onTurnComplete) {
         const getDist = (a, b) => Math.abs(a.gridPos.x - b.gridPos.x) + Math.abs(a.gridPos.y - b.gridPos.y);
 
-        // --- Identify Moves ---
-        const healMove = enemy.moves.find(m => m.type === 'basic_heal');
-        const rangedAttack = enemy.moves.find(m => ['arrow_attack', 'fireball', 'freeze_ball'].includes(m.type));
-        const basicAttack = enemy.moves.find(m => m.type === 'attack');
-        
-        // --- 1. Healer Logic ---
-        if (healMove) {
-            const allies = this.units.filter(u => !u.isPlayer && u !== enemy);
-            const woundedAllies = allies.filter(a => a.stats.currentHealth / a.stats.maxHealth < 0.7);
-            if (woundedAllies.length > 0) {
-                woundedAllies.sort((a, b) => (a.stats.currentHealth / a.stats.maxHealth) - (b.stats.currentHealth / b.stats.maxHealth));
-                const targetAlly = woundedAllies[0];
-                if (getDist(enemy, targetAlly) <= healMove.range) {
-                    this.performEnemyHeal(enemy, targetAlly, healMove, onTurnComplete);
-                    return;
-                }
-            }
-        }
+        // --- 1. Identify Valid Targets ---
+        // Filter out dead units
+        const potentialTargets = this.playerUnits.filter(p => p.stats.currentHealth > 0);
 
-        const potentialTargets = this.playerUnits.filter(p => p.stats.currentHealth > 0).sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
+        // Sort by health (weakest first) or distance
+        potentialTargets.sort((a, b) => a.stats.currentHealth - b.stats.currentHealth);
+
         if (potentialTargets.length === 0) {
             onTurnComplete();
             return;
         }
 
-        // --- 2. Ranged Attack Logic ---
-        if (rangedAttack) {
-            // a) Can I attack from here?
-            const targetInRange = potentialTargets.find(p => getDist(enemy, p) <= rangedAttack.range);
+        const closestTarget = potentialTargets[0]; // Simplification: focus on one target
+
+        // --- 2. Check for Attack Opportunity (Standing Still) ---
+        // Can I attack anyone from where I am right now?
+        const attackMove = enemy.moves.find(m => ['attack', 'arrow_attack', 'fireball', 'freeze_ball'].includes(m.type));
+        if (attackMove) {
+            const targetInRange = potentialTargets.find(p => getDist(enemy, p) <= attackMove.range);
             if (targetInRange) {
-                this.performEnemyAttack(enemy, targetInRange, rangedAttack, onTurnComplete);
+                this.performEnemyAttack(enemy, targetInRange, attackMove, onTurnComplete);
                 return;
             }
+        }
 
-            // b) Find best kiting position
-            let bestMove = { tile: null, target: null, dist: -1 };
-            const allPlayerPositions = this.playerUnits.map(p => p.gridPos);
-            const allWalkableTiles = this.getAllWalkableTilesInRange(enemy.gridPos, enemy.stats.moveRange);
+        const isRanged = attackMove && attackMove.range > 1;
 
-            for (const tile of allWalkableTiles) {
-                for (const target of potentialTargets) {
-                    if (Math.abs(tile.x - target.gridPos.x) + Math.abs(tile.y - target.gridPos.y) <= rangedAttack.range) {
-                        const distToNearestPlayer = Math.min(...allPlayerPositions.map(p => Math.abs(tile.x - p.x) + Math.abs(tile.y - p.y)));
-                        if (distToNearestPlayer > bestMove.dist) {
-                            bestMove = { tile, target, dist: distToNearestPlayer };
+        if (isRanged) {
+            // For ranged units, just move towards the target to get in range.
+            this.easystar.stopAvoidingAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y);
+            this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, closestTarget.gridPos.x, closestTarget.gridPos.y, (path) => {
+                this.easystar.avoidAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y); // Restore avoidance
+
+                if (path && path.length > 2) { // Need at least start, one step, and target
+                    const pathToFollow = path.slice(0, path.length - 1); // Exclude target's tile
+                    const truncatedPath = pathToFollow.slice(0, Math.min(pathToFollow.length, enemy.stats.moveRange + 1));
+
+                    this.moveCharacterAlongPath(enemy, truncatedPath, () => {
+                        // After moving, check again if can attack.
+                        if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
+                            this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
+                        } else {
+                            onTurnComplete();
                         }
-                    }
+                    });
+                } else {
+                    // No path or path is too short to move.
+                    onTurnComplete();
                 }
-            }
-            if (bestMove.tile) {
-                this.executeEnemyMove(enemy, bestMove.tile.x, bestMove.tile.y, () => {
-                    this.performEnemyAttack(enemy, bestMove.target, rangedAttack, onTurnComplete);
-                });
-                return;
-            }
+            });
+            this.easystar.calculate();
+            return;
         }
         
-        // --- 3. Melee Attack / Fallback Move ---
-        if (basicAttack) {
-            const unitsInMeleeRange = potentialTargets.filter(p => getDist(enemy, p) <= basicAttack.range);
-            if (unitsInMeleeRange.length > 0) {
-                this.performEnemyAttack(enemy, unitsInMeleeRange[0], basicAttack, onTurnComplete);
-                return;
-            }
-        }
-        
-        // Find a valid adjacent tile to the closest target
-        const closestTarget = potentialTargets[0];
-        const blockedCoords = new Set();
-        this.units.forEach(u => {
-            if (u !== enemy) blockedCoords.add(`${u.gridPos.x},${u.gridPos.y}`);
-        });
-        this.sceneryObjects.forEach(s => {
-            blockedCoords.add(`${s.gridPos.x},${s.gridPos.y}`);
-        });
-
-        const neighbors = [
+        // --- 3. Find Best Movement Tile for Melee ---
+        const targetNeighbors = [
             {x: closestTarget.gridPos.x + 1, y: closestTarget.gridPos.y},
             {x: closestTarget.gridPos.x - 1, y: closestTarget.gridPos.y},
             {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y + 1},
             {x: closestTarget.gridPos.x, y: closestTarget.gridPos.y - 1}
         ];
+        const validDestinations = targetNeighbors.filter(pos => this.isTileFree(pos.x, pos.y));
+        if (validDestinations.length === 0) {
+            // Fallback: No adjacent spot is free. Move towards the player anyway.
+            this.easystar.stopAvoidingAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y);
+            this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, closestTarget.gridPos.x, closestTarget.gridPos.y, (path) => {
+                this.easystar.avoidAdditionalPoint(closestTarget.gridPos.x, closestTarget.gridPos.y); // Restore avoidance
 
-        const validAttackSpots = neighbors.filter(pos => {
-            if (pos.x < 0 || pos.x >= this.mapConsts.MAP_SIZE_X || pos.y < 0 || pos.y >= this.mapConsts.MAP_SIZE_Y) return false;
-            const isGroundWalkable = this.walkableTiles.includes(this.grid[pos.y][pos.x]);
-            const isBlocked = blockedCoords.has(`${pos.x},${pos.y}`);
-            return isGroundWalkable && !isBlocked;
-        });
+                if (path && path.length > 2) { // Need at least start, one step, and target
+                    const pathToFollow = path.slice(0, path.length - 1); // Exclude target's tile
+                    const truncatedPath = pathToFollow.slice(0, Math.min(pathToFollow.length, enemy.stats.moveRange + 1));
 
-        if (validAttackSpots.length > 0) {
-            validAttackSpots.sort((a, b) => getDist({gridPos: a}, enemy) - getDist({gridPos: b}, enemy));
-            const bestMoveTile = validAttackSpots[0];
-            this.executeEnemyMove(enemy, bestMoveTile.x, bestMoveTile.y, () => {
-                const attackMove = basicAttack || rangedAttack;
-                if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
-                    this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
+                    this.moveCharacterAlongPath(enemy, truncatedPath, () => {
+                        // After moving, check again if can attack.
+                        if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
+                            this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
+                        } else {
+                            onTurnComplete();
+                        }
+                    });
                 } else {
+                    // No path or path is too short to move.
                     onTurnComplete();
                 }
             });
+            this.easystar.calculate();
             return;
         }
 
-        // --- 4. No Action Possible ---
-        onTurnComplete();
-    }    getAllWalkableTilesInRange(startPos, range) {
+        // Sort destinations by distance to the enemy (find the closest one to me)
+        validDestinations.sort((a, b) => {
+            const distA = Math.abs(a.x - enemy.gridPos.x) + Math.abs(a.y - enemy.gridPos.y);
+            const distB = Math.abs(b.x - enemy.gridPos.x) + Math.abs(b.y - enemy.gridPos.y);
+            return distA - distB;
+        });
+
+        const chosenTile = validDestinations[0];
+
+        // --- 4. Execute Move ---
+        // We use EasyStar to find the path to that specific open tile
+        this.easystar.findPath(enemy.gridPos.x, enemy.gridPos.y, chosenTile.x, chosenTile.y, (path) => {
+            if (path && path.length > 1) {
+                const truncatedPath = path.slice(0, Math.min(path.length, enemy.stats.moveRange + 1));
+
+                // Double check the end of the path is still free (paranoid check)
+                const dest = truncatedPath[truncatedPath.length-1];
+                if (!this.isTileFree(dest.x, dest.y)) {
+                    onTurnComplete();
+                    return;
+                }
+
+                this.moveCharacterAlongPath(enemy, truncatedPath, () => {
+                    // Turn finished moving, now try to attack
+                    if (attackMove && getDist(enemy, closestTarget) <= attackMove.range) {
+                        this.performEnemyAttack(enemy, closestTarget, attackMove, onTurnComplete);
+                    } else {
+                        onTurnComplete();
+                    }
+                });
+            } else {
+                // No path found
+                onTurnComplete();
+            }
+        });
+        this.easystar.calculate();
+    }
+    getAllWalkableTilesInRange(startPos, range) {
         const tiles = [];
         const openList = [{ pos: startPos, cost: 0 }];
         const closedList = new Set([`${startPos.x},${startPos.y}`]);

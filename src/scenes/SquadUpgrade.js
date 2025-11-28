@@ -157,7 +157,7 @@ export class SquadUpgrade extends Phaser.Scene {
 
     onCardSelected(card, index) {
         if (this.isFirstTime) {
-            if (this.playerArmy.length >= 3) {
+            if (this.unitsPurchased >= 3) {
                 console.log("You can only have 3 units for your initial squad.");
                 return;
             }
@@ -253,7 +253,7 @@ export class SquadUpgrade extends Phaser.Scene {
     updatePurchaseLimitText() {
         if (this.isFirstTime) {
             const requiredUnits = 3;
-            const remaining = requiredUnits - this.playerArmy.length;
+            const remaining = requiredUnits - this.unitsPurchased;
             if (remaining > 0) {
                 this.purchaseLimitText.setText(`Select ${remaining} more unit(s)`);
             } else {
@@ -301,7 +301,7 @@ export class SquadUpgrade extends Phaser.Scene {
         }
 
         const requiredUnits = this.isFirstTime ? 3 : 0;
-        if (this.playerArmy.length >= requiredUnits) {
+        if ((this.isFirstTime && this.unitsPurchased >= requiredUnits) || (!this.isFirstTime && this.playerArmy.length >= requiredUnits)) {
             this.startBattleBtn.alpha = 1;
             this.startBattleBtn.setInteractive({ useHandCursor: true });
         } else {
