@@ -35,6 +35,9 @@ export class Unit {
         this.usedStandardAction = false;
         this.isHighlighted = false;
 
+        // --- NEW: Flag to track if we are physically moving (hopping) ---
+        this.isMovingSprite = false;
+
         const screenX = scene.origin.x + (this.gridPos.x - this.gridPos.y) * scene.mapConsts.HALF_WIDTH;
         const originalY = scene.origin.y + (this.gridPos.x + this.gridPos.y) * scene.mapConsts.QUARTER_HEIGHT;
 
@@ -44,7 +47,10 @@ export class Unit {
         this.sprite.setDepth(originalY);
         this.sprite.setScale(1);
 
-        // --- NEW: Shadow Property ---
+        // --- Idle Tween Reference ---
+        this.idleTween = null;
+
+        // --- Shadow Property ---
         this.shadow = null;
         this.createShadow(); // Generate shadow immediately
 
@@ -52,7 +58,6 @@ export class Unit {
         this.createHealthBar();
     }
 
-    // --- NEW: Create Shadow Helper ---
     createShadow() {
         if (this.shadow) return;
 
@@ -62,27 +67,36 @@ export class Unit {
         this.shadow.setAlpha(0.3);
         this.shadow.setScale(1, - 0.5);
 
-
         this.shadow.setOrigin(0.5, 0.85);
         this.shadow.setDepth(this.sprite.depth - 0.1);
 
         this.shadow.skewX = - 0.5;
     }
+
     createHealthBar() {
         this.healthBar = this.scene.add.graphics();
         this.updateHealthBar();
     }
 
     updateHealthBar() {
-        if (!this.healthBar) return;
+        if (!this.healthBar || !this.sprite) return;
 
         this.healthBar.clear();
         this.healthBar.setDepth(this.sprite.depth + 1);
 
         const width = 24;
         const height = 4;
+
+        // --- LOGIC FIX: Stick to Sprite if moving/hopping, stick to Ground if Idle ---
+        let anchorY;
+        if (this.isMovingSprite) {
+            anchorY = this.sprite.y;
+        } else {
+            anchorY = this.sprite.getData('originalY') || this.sprite.y;
+        }
+
         const x = this.sprite.x - (width / 2);
-        const y = this.sprite.y - 48;
+        const y = anchorY - 48; // Position above the anchor point
         const borderThickness = 1;
 
         // Border
@@ -115,35 +129,76 @@ export class Unit {
         return effectiveStats;
     }
 
+    startIdle() {
+        // If we are already idling or the sprite is destroyed, do nothing
+        if (this.idleTween && this.idleTween.isPlaying()) return;
+        if (!this.sprite || !this.sprite.active) return;
+
+        const originalY = this.sprite.getData('originalY');
+
+        // Safety: Ensure we start from the correct floor position
+        this.sprite.y = originalY;
+
+        // Randomize to prevent synchronization
+        const randomDuration = 800 + Math.random() * 400;
+        const randomDelay = Math.random() * 500;
+
+        this.idleTween = this.scene.tweens.add({
+            targets: this.sprite,
+            y: originalY - 3, // Move up 2 pixels
+            duration: randomDuration,
+            delay: randomDelay,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Linear'
+        });
+    }
+
+    stopIdle() {
+        if (this.idleTween) {
+            this.idleTween.stop();
+            this.idleTween = null;
+        }
+
+        // Reset to floor immediately
+        if (this.sprite && this.sprite.active) {
+            const originalY = this.sprite.getData('originalY');
+            if (originalY !== undefined) {
+                this.sprite.y = originalY;
+            }
+        }
+    }
+
     update() {
-        // --- NEW: Synchronize Shadow ---
+        // --- Synchronize Shadow ---
         if (this.shadow) {
-            // 1. Sync Position (If not strictly tweening, this acts as a safety anchor)
-            // Note: During jump tweens, we usually tween the shadow independently,
-            // but for idle/standing, this keeps it attached.
             if (!this.scene.isMoving) {
                 this.shadow.x = this.sprite.x;
-                this.shadow.y = this.sprite.y;
+                // Shadow stays on the "ground" (originalY) even if sprite bobs up
+                this.shadow.y = this.sprite.getData('originalY') || this.sprite.y;
             }
 
-            // 2. Sync Animation Frame
+            // Sync Animation Frame
             if (this.sprite.frame.name !== this.shadow.frame.name) {
                 this.shadow.setFrame(this.sprite.frame.name);
             }
 
-            // 3. Sync Flip
+            // Sync Flip
             this.shadow.flipX = this.sprite.flipX;
 
-            // 4. Sync Depth (Always slightly behind unit)
-            this.shadow.setDepth(this.sprite.depth - 0.1);
+            // Sync Depth (Always slightly behind unit)
+            const depthY = this.sprite.getData('originalY') || this.sprite.y;
+            this.shadow.setDepth(depthY - 0.1);
 
-            // 5. Visibility
+            // Visibility
             this.shadow.visible = this.sprite.visible;
             this.shadow.alpha = this.sprite.alpha * 0.3; // inherit alpha fade
         }
 
         // Update depth based on Y for isometric sorting
-        this.sprite.setDepth(this.sprite.y + 16);
+        const depthY = this.sprite.getData('originalY') || this.sprite.y;
+        this.sprite.setDepth(depthY + 16);
+
         this.updateHealthBar();
 
         const burnEffect = this.statusEffects.find(effect => effect.type === 'burn');
@@ -155,7 +210,7 @@ export class Unit {
             this.sprite.setTint(0x0000ff);
         }
 
-        // Armor up logic (Unchanged)
+        // Armor up logic
         const armorUpEffect = this.statusEffects.find(effect => effect.type === 'armor_up');
         if (armorUpEffect) {
             if (!this.armorUpEmitter) {
@@ -205,30 +260,24 @@ export class Unit {
         return { damage: Math.floor(damage), isCrit: isCrit };
     }
 
-    // --- UPDATED: The "Lunge" Attack Animation ---
     attack(target, onImpactCallback) {
-        const scene = this.scene;
+        this.stopIdle(); // Stop bobbing
 
-        // Define objects to animate (Sprite + Shadow)
+        const scene = this.scene;
         const targets = this.shadow ? [this.sprite, this.shadow] : [this.sprite];
 
-        // 1. Calculate direction vector
         const startX = this.sprite.x;
         const startY = this.sprite.y;
         const dx = target.sprite.x - startX;
         const dy = target.sprite.y - startY;
 
-        // Lunge distance (40% of the way to the enemy)
         const lungeFactor = 0.4;
         const lungeX = dx * lungeFactor;
         const lungeY = dy * lungeFactor;
 
-        // Store original position if not already stored
         const originalY = this.sprite.getData('originalY') || startY;
 
         // SEQUENCE: Windup -> Strike -> Impact -> Recoil
-
-        // 1. Wind Up (Pull back slowly)
         scene.tweens.add({
             targets: targets,
             x: startX - (lungeX * 0.2),
@@ -236,27 +285,24 @@ export class Unit {
             duration: 150,
             ease: 'Quad.easeOut',
             onComplete: () => {
-
-                // 2. The Strike (Dash forward FAST)
                 scene.tweens.add({
                     targets: targets,
                     x: startX + lungeX,
                     y: startY + lungeY,
-                    duration: 60, // Very fast
+                    duration: 60,
                     ease: 'Expo.easeIn',
                     onComplete: () => {
-
-                        // --- IMPACT MOMENT ---
                         if (onImpactCallback) onImpactCallback();
-
-                        // 3. Recoil (Bounce back)
                         scene.tweens.add({
                             targets: targets,
                             x: startX,
                             y: originalY,
                             duration: 300,
-                            delay: 100, // Small "Hit Stop" pause at the point of impact
-                            ease: 'Back.easeOut'
+                            delay: 100,
+                            ease: 'Back.easeOut',
+                            onComplete: () => {
+                                this.startIdle(); // Resume bobbing
+                            }
                         });
                     }
                 });
@@ -265,48 +311,39 @@ export class Unit {
     }
 
     lungeUp(onImpactCallback) {
+        this.stopIdle(); // Stop bobbing
+
         const scene = this.scene;
-
-        // Define objects to animate (Sprite + Shadow)
         const targets = this.shadow ? [this.sprite, this.shadow] : [this.sprite];
-
-        // 1. Calculate direction vector
         const startX = this.sprite.x;
         const startY = this.sprite.y;
-        const lungeY = -20; // Move 20 pixels up
+        const lungeY = -20;
 
-        // Store original position if not already stored
         const originalY = this.sprite.getData('originalY') || startY;
 
-        // SEQUENCE: Windup -> Strike -> Impact -> Recoil
-
-        // 1. Wind Up (Pull back slowly)
         scene.tweens.add({
             targets: targets,
             y: startY + 10,
             duration: 150,
             ease: 'Quad.easeOut',
             onComplete: () => {
-
-                // 2. The Strike (Dash forward FAST)
                 scene.tweens.add({
                     targets: targets,
                     y: startY + lungeY,
-                    duration: 60, // Very fast
+                    duration: 60,
                     ease: 'Expo.easeIn',
                     onComplete: () => {
-
-                        // --- IMPACT MOMENT ---
                         if (onImpactCallback) onImpactCallback();
-
-                        // 3. Recoil (Bounce back)
                         scene.tweens.add({
                             targets: targets,
                             x: startX,
                             y: originalY,
                             duration: 300,
-                            delay: 100, // Small "Hit Stop" pause at the point of impact
-                            ease: 'Back.easeOut'
+                            delay: 100,
+                            ease: 'Back.easeOut',
+                            onComplete: () => {
+                                this.startIdle(); // Resume bobbing
+                            }
                         });
                     }
                 });
@@ -324,6 +361,8 @@ export class Unit {
     }
 
     takeDamage(damageInfo, attacker = null, move = null) {
+        this.stopIdle(); // Stop bobbing to react to damage
+
         const { damage, isCrit } = damageInfo;
         const finalDamage = Math.floor(damage);
 
@@ -333,13 +372,9 @@ export class Unit {
         this.updateHealthBar();
         this.scene.events.emit('unit_stats_changed', this);
 
-        // --- FIX: Wrap flash in a 5ms delay ---
-        // This ensures it runs AFTER 'clearHighlights()' cleans the board.
         this.scene.time.delayedCall(5, () => {
             if (this.sprite && this.sprite.active) {
-                this.sprite.setTintFill(0xffffff); // Turn White
-
-                // Clear the white flash after 100ms
+                this.sprite.setTintFill(0xffffff);
                 this.scene.time.delayedCall(100, () => {
                     if (this.sprite && this.sprite.active) {
                         this.sprite.clearTint();
@@ -348,7 +383,6 @@ export class Unit {
             }
         });
 
-        // Slash Effect Sprite
         if (move && move.type === 'attack') {
             const slashEffect = this.scene.add.sprite(this.sprite.x, this.sprite.y - 16, ASSETS.image.melee_slash_effect.key);
             slashEffect.setDepth(this.sprite.depth + 10);
@@ -362,7 +396,6 @@ export class Unit {
             });
         }
 
-        // Damage Number
         const damageString = finalDamage.toString();
         const textColor = isCrit ? '#ffff00' : '#ff0000';
         const textStyle = {
@@ -377,9 +410,8 @@ export class Unit {
         const damageText = this.scene.add.text(this.sprite.x, this.sprite.y - 40, damageString, textStyle);
         damageText.setOrigin(0.5, 0.5);
         damageText.setDepth(999999);
-        damageText.setScale(0.5); // Start small for pop effect
+        damageText.setScale(0.5);
 
-        // Animate Damage Text (Pop up and float)
         this.scene.tweens.add({
             targets: damageText,
             scaleX: 1,
@@ -398,7 +430,6 @@ export class Unit {
             }
         });
 
-        // Knockback (Unchanged)
         if (attacker && this.stats.currentHealth > 0) {
             const targets = this.shadow ? [this.sprite, this.shadow] : [this.sprite];
             const dx = this.sprite.x - attacker.sprite.x;
@@ -415,6 +446,13 @@ export class Unit {
                 duration: 60,
                 yoyo: true,
                 ease: 'Sine.easeInOut',
+                onComplete: () => {
+                    this.startIdle(); // Resume bobbing after knockback
+                }
+            });
+        } else if (this.stats.currentHealth > 0) {
+            this.scene.time.delayedCall(200, () => {
+                this.startIdle();
             });
         }
 
@@ -426,18 +464,17 @@ export class Unit {
     }
 
     die() {
+        this.stopIdle();
         console.log(`${this.name} has been defeated.`);
         this.scene.events.emit('unit_died', this);
 
-        // Hide UI elements immediately
         if (this.healthBar) this.healthBar.visible = false;
         if (this.shadow) this.shadow.visible = false;
 
-        // Play a death animation
         this.scene.tweens.add({
             targets: this.sprite,
             alpha: 0,
-            y: this.sprite.y + 10, // Sink into ground
+            y: this.sprite.y + 10,
             duration: 1000,
             onComplete: () => {
                 this.destroy();
@@ -446,8 +483,9 @@ export class Unit {
     }
 
     destroy() {
+        this.stopIdle();
         if (this.sprite) this.sprite.destroy();
-        if (this.shadow) this.shadow.destroy(); // Clean up shadow
+        if (this.shadow) this.shadow.destroy();
         if (this.healthBar) this.healthBar.destroy();
         if (this.armorUpEmitter) this.armorUpEmitter.destroy();
     }
