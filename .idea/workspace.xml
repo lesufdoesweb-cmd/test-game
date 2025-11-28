@@ -6,17 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="redo">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets/ability_icons/trap.aseprite" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets/ability_icons/trap.aseprite" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets/units/paladin.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets/units/paladin.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets/user_interface/button_background.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets/user_interface/button_background.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/gameObjects/Unit.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/Unit.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/gameObjects/abilities.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/abilities.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/gameObjects/unitTypes.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/gameObjects/unitTypes.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/player_armies/default_army.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/player_armies/default_army.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scenes/Game.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/Game.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scenes/MainMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/MainMenu.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/UnitCard.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UnitCard.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,7 +65,9 @@
       <workItem from="1764093100951" duration="2832000" />
       <workItem from="1764166890901" duration="948000" />
       <workItem from="1764230431012" duration="613000" />
-      <workItem from="1764242525923" duration="12382000" />
+      <workItem from="1764242525923" duration="12649000" />
+      <workItem from="1764322126504" duration="607000" />
+      <workItem from="1764324415694" duration="1569000" />
     </task>
     <task id="LOCAL-00001" summary="redo">
       <option name="closed" value="true" />
@@ -99,7 +93,15 @@
       <option name="project" value="LOCAL" />
       <updated>1764244037402</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764270766145</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1764270766145</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

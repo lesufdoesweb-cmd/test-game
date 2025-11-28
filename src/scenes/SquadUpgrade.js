@@ -33,7 +33,7 @@ export class SquadUpgrade extends Phaser.Scene {
 
         this.tweens.add({
             targets: this.refreshBtn,
-            scale: 1.05,
+            y: this.refreshBtn.y - 10,
             duration: 800,
             yoyo: true,
             repeat: -1,

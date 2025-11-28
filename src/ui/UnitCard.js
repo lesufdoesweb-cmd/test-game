@@ -6,33 +6,119 @@ export class UnitCard {
         this.x = x;
         this.y = y;
 
-        this.legendaryEmitter = null;
+        this.rarityEmitter = null;
+        this.idleTween = null;
+        this.hoverTween = null;
+        this.isAnimating = false;
 
-        // Container
+        // --- 1. The MAIN Outer Container ---
+        // Holds everything, handles movement and scaling.
         this.cardContainer = scene.add.container(x, y);
         this.cardContainer.setDepth(10);
         this.cardContainer.setScale(2);
 
-        // Shadow (Inside container, slightly offset)
+        // Shadow goes into Outer container so it DOESN'T get the outline FX
         this.shadow = scene.add.image(10, 10, ASSETS.image.unit_card_common.key);
         this.shadow.setTint(0x000000);
         this.shadow.setAlpha(0.5);
         this.cardContainer.add(this.shadow);
 
+        // --- 2. The Inner Container ---
+        // Holds the actual card visual parts. The FX is applied here.
+        this.innerCardContainer = scene.add.container(0, 0);
+        this.cardContainer.add(this.innerCardContainer);
+
+        // --- SETUP HOVER GLOW/OUTLINE ---
+        // We use addGlow, but we set Quality to 0.1 to make it look harder (like an outline)
+        // addGlow(color, outerStrength, innerStrength, knockout, quality, distance)
+        this.innerCardContainer.postFX.setPadding(32);
+        this.outlineFX = this.innerCardContainer.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 24);
+
+        // Setup Visuals (populates innerCardContainer)
         this.setupCardVisuals(unit, rarity, stats);
 
+        // Setup Interaction on the outer container
+        this.cardContainer.setSize(this.width, this.height);
+        this.cardContainer.setInteractive();
+        this.setupInteractions();
+
+        // Initial Spawn
         this.cardContainer.setScale(0);
         this.playSpawnAnimation();
     }
 
-    setupCardVisuals(unit, rarity, stats) {
-        // 1. Cleanup: Remove everything except shadow
-        this.cardContainer.list.forEach((child) => {
-            if (child !== this.shadow) child.destroy();
+    setupInteractions() {
+        this.cardContainer.on('pointerover', () => {
+            if (this.isAnimating) return;
+
+            if (this.idleTween) this.idleTween.pause();
+
+            // Lift Card
+            if (this.hoverTween) this.hoverTween.stop();
+            this.hoverTween = this.scene.tweens.add({
+                targets: this.cardContainer,
+                y: this.y - 20,
+                duration: 200,
+                ease: 'Sine.out'
+            });
+
+            // Fade in White Outline
+            this.scene.tweens.add({
+                targets: this.outlineFX,
+                outerStrength: 4, // Strength > 0 makes it visible
+                duration: 200
+            });
         });
 
-        // Explicitly clear old emitters so they don't linger
-        this.clearLegendaryParticles();
+        this.cardContainer.on('pointerout', () => {
+            if (this.isAnimating) return;
+
+            // Lower Card
+            if (this.hoverTween) this.hoverTween.stop();
+            this.hoverTween = this.scene.tweens.add({
+                targets: this.cardContainer,
+                y: this.y,
+                duration: 200,
+                ease: 'Sine.out',
+                onComplete: () => {
+                    if (this.idleTween && !this.isAnimating) this.idleTween.resume();
+                }
+            });
+
+            // Fade out White Outline
+            this.scene.tweens.add({
+                targets: this.outlineFX,
+                outerStrength: 0,
+                duration: 200
+            });
+        });
+    }
+
+    startIdleAnimation() {
+        if (this.idleTween) this.idleTween.destroy();
+        this.idleTween = this.scene.tweens.add({
+            targets: this.cardContainer,
+            y: this.y - 3,
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.inOut'
+        });
+    }
+
+    stopIdleAnimation() {
+        if (this.idleTween) {
+            this.idleTween.stop();
+            this.cardContainer.y = this.y;
+        }
+    }
+
+    setupCardVisuals(unit, rarity, stats) {
+        // Clean inner container ONLY.
+        this.innerCardContainer.removeAll(true);
+
+        // Clear old particles (using the new method name)
+        this.clearRarityParticles();
 
         const cardBackgrounds = {
             'common': ASSETS.image.unit_card_common.key,
@@ -42,43 +128,46 @@ export class UnitCard {
         };
         const bgKey = cardBackgrounds[rarity];
 
-        // 2. Update Shadow Texture
+        // Update Shadow Texture
         this.shadow.setTexture(bgKey);
-        this.cardContainer.sendToBack(this.shadow);
 
-        // 3. Card Background
+        // --- Add elements to Inner Container ---
         const bg = this.scene.add.image(0, 0, bgKey);
-        this.cardContainer.add(bg);
+        this.innerCardContainer.add(bg);
 
         this.width = bg.width;
         this.height = bg.height;
 
-        // 4. Glow FX (Applied cleanly to the new BG)
-        if (rarity === 'epic' && bg.preFX) {
-            bg.preFX.addGlow(0xaa00ff, 4, 0, false, 0.1, 32);
-        } else if (rarity === 'legendary') {
+        // --- Rarity Effects (Particles & Glows) ---
+        if (rarity === 'epic') {
+            // Violet Glow on Card
+            if (bg.preFX) bg.preFX.addGlow(0xaa00ff, 4, 0, false, 0.1, 32);
+            // Violet Particles behind
+            this.createRarityParticles(0xaa00ff);
+        }
+        else if (rarity === 'legendary') {
+            // Gold Glow on Card
             if (bg.preFX) bg.preFX.addGlow(0xffd700, 6, 0, false, 0.1, 32);
-            this.createLegendaryParticles();
+            // Gold Particles behind
+            this.createRarityParticles(0xffd700);
         }
 
-        // 5. Unit Sprite
+        // Sprite
         const sprite = this.scene.add.sprite(0, -10, unit.textureKey);
-        this.cardContainer.add(sprite);
+        this.innerCardContainer.add(sprite);
 
-        // 6. Text
+        // Text
         const hpText = this.scene.add.bitmapText(0, 25, 'editundo_55', `HP: ${stats.maxHealth}`, 28)
             .setOrigin(0.5).setLetterSpacing(2).setScale(0.25);
-
         const atkText = this.scene.add.bitmapText(0, 33, 'editundo_55', `ATK: ${stats.physicalDamage}`, 28)
             .setOrigin(0.5).setLetterSpacing(2).setScale(0.25);
-
-        this.cardContainer.add([hpText, atkText]);
+        this.innerCardContainer.add([hpText, atkText]);
 
         let matkText = null;
         if (stats.magicDamage > 0) {
             matkText = this.scene.add.bitmapText(0, 70, 'editundo_55', `MATK: ${stats.magicDamage}`, 28)
                 .setOrigin(0.5).setLetterSpacing(2).setScale(0.25);
-            this.cardContainer.add(matkText);
+            this.innerCardContainer.add(matkText);
         }
 
         this.components = { bg, sprite, hpText, atkText, matkText };
@@ -91,69 +180,82 @@ export class UnitCard {
         if (this.components.matkText) this.components.matkText.setVisible(false);
 
         if (this.components.bg) {
-            // Simulate White Card Back
             this.components.bg.setTintFill(0xdddddd);
-            // Temporarily disable glow while flipped
             if (this.components.bg.preFX) this.components.bg.preFX.active = false;
         }
     }
 
     revealContent(rarity) {
-        // 1. Remove the "Back of Card" tint
         if (this.components.bg) {
             this.components.bg.clearTint();
-
-            // 2. Re-enable glow ONLY if it's supposed to be there (Epic/Legendary)
-            // This prevents the "Lingering Glow" bug
             const hasGlow = (rarity === 'epic' || rarity === 'legendary');
             if (this.components.bg.preFX && hasGlow) {
                 this.components.bg.preFX.active = true;
             }
         }
-
-        // 3. Show content
         if (this.components.sprite) this.components.sprite.setVisible(true);
         if (this.components.hpText) this.components.hpText.setVisible(true);
         if (this.components.atkText) this.components.atkText.setVisible(true);
         if (this.components.matkText) this.components.matkText.setVisible(true);
     }
 
-    createLegendaryParticles() {
-        const spawnZone = new Phaser.Geom.Rectangle(this.x - 40, this.y - 50, 80, 100);
+    createRarityParticles(tint) {
+        // 1. Get current card dimensions
+        const w = this.width;
+        const h = this.height;
 
-        this.legendaryEmitter = this.scene.add.particles(0, 0, 'glow_particle', {
-            speed: { min: 120, max: 200 },
+        // 2. Spawn zone covers the whole card (centered)
+        const spawnZone = new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h);
+
+        this.rarityEmitter = this.scene.add.particles(0, 0, 'dust_particle', {
+            // --- Physics (Matches Dust Effect) ---
+            speed: { min: 30, max: 80 },
             angle: { min: 0, max: 360 },
-            emitZone: { type: 'random', source: spawnZone },
-            scale: { start: 0.8, end: 0 },
-            alpha: { start: 1, end: 0 },
-            lifespan: 1200,
+            gravityY: 10,
+            lifespan: 750,
+
+            // --- Visuals ---
+            scale: { start: 1.0, end: 0 },
+            alpha: { start: 0.6, end: 0 },
+            tint: tint, // Dynamic Color
             blendMode: 'ADD',
-            tint: 0xffd700,
-            quantity: 3,
-            frequency: 60,
+
+            // --- Emission ---
+            emitZone: { type: 'random', source: spawnZone },
+            frequency: 50,
+            quantity: 2,
         });
 
-        this.legendaryEmitter.setDepth(9);
+        // 3. Add to container
+        this.innerCardContainer.add(this.rarityEmitter);
 
-        if (this.legendaryEmitter.preFX) {
-            this.legendaryEmitter.preFX.addGlow(0xffd700, 4, 0, false, 0.1, 32);
+        // 4. Send to Back (renders behind the card sprite)
+        this.innerCardContainer.sendToBack(this.rarityEmitter);
+
+        // Optional: Add a slight glow to the particles themselves for extra "pop"
+        if (this.rarityEmitter.postFX) {
+            this.rarityEmitter.postFX.addGlow(tint, 2, 0, false, 0.1, 16);
         }
     }
 
-    clearLegendaryParticles() {
-        if (this.legendaryEmitter) {
-            this.legendaryEmitter.destroy();
-            this.legendaryEmitter = null;
+    clearRarityParticles() {
+        if (this.rarityEmitter) {
+            this.rarityEmitter.destroy();
+            this.rarityEmitter = null;
         }
     }
 
     playSpawnAnimation() {
+        this.isAnimating = true;
         this.scene.tweens.add({
             targets: this.cardContainer,
             scale: 2,
             duration: 400,
-            ease: 'Back.out'
+            ease: 'Back.out',
+            onComplete: () => {
+                this.isAnimating = false;
+                this.startIdleAnimation();
+            }
         });
     }
 
@@ -162,15 +264,17 @@ export class UnitCard {
         this.clearLegendaryParticles();
     }
 
-    // --- REFRESH LOGIC ---
     refreshContent(newConfig) {
+        this.isAnimating = true;
+        this.stopIdleAnimation();
+        this.outlineFX.outerStrength = 0; // Turn off hover glow
 
         const jumpDuration = 300;
         const flipDuration = 200;
         const fallDuration = 300;
+        let hasRevealed = false;
 
         const timeline = this.scene.add.timeline([
-            // 1. Jump Up
             {
                 at: 0,
                 tween: {
@@ -180,7 +284,6 @@ export class UnitCard {
                     ease: 'Quad.out'
                 }
             },
-            // 2. Flip Halfway (Hide content)
             {
                 at: jumpDuration,
                 tween: {
@@ -190,16 +293,15 @@ export class UnitCard {
                     ease: 'Linear'
                 }
             },
-            // 3. Swap to White Back
             {
                 at: jumpDuration + (flipDuration / 2),
                 run: () => {
-                    // Setup new data but hide it behind the "White Back" look
                     this.setupCardVisuals(newConfig.unit, newConfig.rarity, newConfig.stats);
                     this.setHiddenState();
+                    // Update size on outer container
+                    this.cardContainer.setSize(this.width, this.height);
                 }
             },
-            // 4. Flip Open (Show White Back)
             {
                 at: jumpDuration + (flipDuration / 2) + 1,
                 tween: {
@@ -209,7 +311,6 @@ export class UnitCard {
                     ease: 'Linear'
                 }
             },
-            // 5. Fall Down & REVEAL ON LANDING
             {
                 at: jumpDuration + flipDuration,
                 tween: {
@@ -217,11 +318,16 @@ export class UnitCard {
                     y: this.y,
                     duration: fallDuration,
                     ease: 'Bounce.out',
+                    onUpdate: (tween, target) => {
+                        if (!hasRevealed && target.y >= this.y - 10) {
+                            hasRevealed = true;
+                            this.revealContent(newConfig.rarity);
+                            this.playDustEffect(newConfig.rarity);
+                        }
+                    },
                     onComplete: () => {
-                        // 1. Reveal IMMEDIATELY upon landing
-                        this.revealContent(newConfig.rarity);
-                        // 2. Play dust
-                        this.playDustEffect();
+                        this.isAnimating = false;
+                        this.startIdleAnimation();
                     }
                 }
             }
@@ -230,33 +336,39 @@ export class UnitCard {
         timeline.play();
     }
 
-    playDustEffect() {
-        // Define a rectangle zone that encompasses the entire card
-        // This makes dust appear "all around"
+    playDustEffect(rarity) {
+        const colors = {
+            'common': 0x888888,
+            'rare': 0x0088ff,
+            'epic': 0xaa00ff,
+            'legendary': 0xffd700
+        };
+        const dustColor = colors[rarity] || 0x888888;
+
         const cardW = this.width * 2;
         const cardH = this.height * 2;
 
         const dustZone = new Phaser.Geom.Rectangle(
-            this.x - cardW / 2 - 10, // x
-            this.y - cardH / 2 - 10, // y
-            cardW + 20,              // width
-            cardH + 20               // height
+            this.x - cardW / 2 - 10,
+            this.y - cardH / 2 - 10,
+            cardW + 20,
+            cardH + 20
         );
 
         const emitter = this.scene.add.particles(0, 0, 'dust_particle', {
-            lifespan: 750, // 0.75 seconds
-            speed: { min: 30, max: 80 }, // Slow drifting dust
-            angle: { min: 0, max: 360 }, // All directions
+            lifespan: 750,
+            speed: { min: 30, max: 80 },
+            angle: { min: 0, max: 360 },
             scale: { start: 1.0, end: 0 },
             alpha: { start: 0.6, end: 0 },
             gravityY: 10,
-            quantity: 30,
-            tint: 0x888888, // Gray dust
+            quantity: 1000,
+            tint: dustColor,
             emitZone: { type: 'random', source: dustZone },
             emitting: false
         });
 
-        emitter.setDepth(100);
+        emitter.setDepth(1);
         emitter.explode();
 
         this.scene.time.delayedCall(1000, () => emitter.destroy());
