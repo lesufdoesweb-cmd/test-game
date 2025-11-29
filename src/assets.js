@@ -26,6 +26,26 @@ export default {
             key: 'main_menu_background',
             args: ['src/assets/backgrounds/main_menu.png']
         },
+        main_menu_front: {
+            key: 'main_menu_front',
+            args: ['src/assets/backgrounds/main_menu_front.png']
+        },
+        cloud_1: {
+            key: 'cloud_1',
+            args: ['src/assets/backgrounds/cloud_1.png']
+        },
+        cloud_2: {
+            key: 'cloud_2',
+            args: ['src/assets/backgrounds/cloud_2.png']
+        },
+        cloud_3: {
+            key: 'cloud_3',
+            args: ['src/assets/backgrounds/cloud_3.png']
+        },
+        cloud_4: {
+            key: 'cloud_4',
+            args: ['src/assets/backgrounds/cloud_4.png']
+        },
         title_main_screen: {
             key: 'title_main_screen',
             args: ['src/assets/main_screen/title_main_screen.png']
@@ -116,7 +136,7 @@ export default {
         },
         start_button: {
             key: 'start_button',
-            args: ['src/assets/user_interface/start_button_2.png']
+            args: ['src/assets/user_interface/start_game.png']
         },
         bg_fights: {
             key: 'bg_fights',
