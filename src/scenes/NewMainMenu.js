@@ -161,10 +161,10 @@ export class NewMainMenu extends Phaser.Scene {
             lifespan: { min: 2000, max: 5000 },
             speedY: { min: -15, max: -35 },
             speedX: { min: -5, max: 5 },
-            scale: { start: 2, end: 5 },
+            scale: { start: 5, end: 10 },
             alpha: { start: 0.4, end: 0 },
             tint: 0xDDDDDD,
-            frequency: 50,
+            frequency: 25,
             quantity: 1,
             blendMode: 'NORMAL'
         });
