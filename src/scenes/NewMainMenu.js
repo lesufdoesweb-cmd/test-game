@@ -18,7 +18,7 @@ export class NewMainMenu extends Phaser.Scene {
         container.setSize(background.width, background.height);
         container.setInteractive({ useHandCursor: true });
 
-        const glowFx = container.postFX.addGlow(0x90EE90, 0, 0, false, 0.1, 10);
+        const glowFx = container.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 10);
 
         container.on('pointerdown', onClick);
 
@@ -261,7 +261,7 @@ export class NewMainMenu extends Phaser.Scene {
 
             this.tweens.add({
                 targets: startButton,
-                y: startButton.y - 1,
+                y: startButton.y - 4,
                 duration: 100,
                 ease: 'Sine.easeOut'
             });
