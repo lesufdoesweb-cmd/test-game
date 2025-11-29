@@ -32,16 +32,16 @@ export class Background extends Phaser.Scene {
     update() {
         const topSceneKey = this.scene.manager.getScenes(true).pop()?.scene.key;
         const gameIsOnTop = (topSceneKey === 'ActionUI');
-
-        if (gameIsOnTop && !this.isGameActive) {
-            this.isGameActive = true;
-            if (this.gradientImage) this.gradientImage.setVisible(false);
-            this.cameras.main.setBackgroundColor('#000000');
-        } else if (!gameIsOnTop && this.isGameActive) {
-            this.isGameActive = false;
-            if (this.gradientImage) this.gradientImage.setVisible(true);
-            // The camera background will be covered by the gradient image,
-            // so we don't need to make it transparent again.
-        }
+        this.gradientImage.setVisible(false);
+        // if (gameIsOnTop && !this.isGameActive) {
+        //     this.isGameActive = true;
+        //     if (this.gradientImage) this.gradientImage.setVisible(false);
+        //     this.cameras.main.setBackgroundColor('#000000');
+        // } else if (!gameIsOnTop && this.isGameActive) {
+        //     this.isGameActive = false;
+        //     if (this.gradientImage) this.gradientImage.setVisible(true);
+        //     // The camera background will be covered by the gradient image,
+        //     // so we don't need to make it transparent again.
+        // }
     }
 }

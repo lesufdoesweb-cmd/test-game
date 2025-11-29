@@ -22,6 +22,10 @@ export default {
             key: 'bg_main_screen',
             args: ['src/assets/main_screen/bg_main_screen.png']
         },
+        main_menu_background: {
+            key: 'main_menu_background',
+            args: ['src/assets/backgrounds/main_menu.png']
+        },
         title_main_screen: {
             key: 'title_main_screen',
             args: ['src/assets/main_screen/title_main_screen.png']
