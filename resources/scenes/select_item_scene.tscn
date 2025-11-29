@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://csalgs0pu2y0k"]
-
-[ext_resource type="Script" path="res://scripts/Helpers/SelectItems.cs" id="1_jfsx2"]
-
-[node name="CanvasLayer" type="CanvasLayer"]
-script = ExtResource("1_jfsx2")

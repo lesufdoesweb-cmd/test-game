@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="tes">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/scenes/NewMainMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/NewMainMenu.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="refactor" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "lesufdoesweb-cmd"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/lesufdoesweb-cmd/test-game.git",
+    "accountId": "2cc5c27c-60ad-4a27-b637-3cbe5ceffea0"
+  }
+}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="35yrLoCcfOX60gk4EB79j24j21n" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "ShowUsagesActions.previewPropertyKey": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-822845ee3bb5-JavaScript-PS-243.23654.168" />
+        <option value="bundled-php-predefined-a98d8de5180a-4c3855d0ab16-com.jetbrains.php.sharedIndexes-PS-243.23654.168" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="" />
+      <created>1764093098960</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1764093098960</updated>
+      <workItem from="1764093100951" duration="2832000" />
+      <workItem from="1764166890901" duration="948000" />
+      <workItem from="1764230431012" duration="613000" />
+      <workItem from="1764242525923" duration="12649000" />
+      <workItem from="1764322126504" duration="607000" />
+      <workItem from="1764324415694" duration="29159000" />
+    </task>
+    <task id="LOCAL-00001" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764093455489</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1764093455489</updated>
+    </task>
+    <task id="LOCAL-00002" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764167212004</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1764167212004</updated>
+    </task>
+    <task id="LOCAL-00003" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764244037402</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1764244037402</updated>
+    </task>
+    <task id="LOCAL-00004" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764270766145</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1764270766145</updated>
+    </task>
+    <task id="LOCAL-00005" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764326096614</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1764326096614</updated>
+    </task>
+    <task id="LOCAL-00006" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764327821540</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1764327821540</updated>
+    </task>
+    <task id="LOCAL-00007" summary="redo">
+      <option name="closed" value="true" />
+      <created>1764334390186</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1764334390186</updated>
+    </task>
+    <task id="LOCAL-00008" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764337181437</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1764337181437</updated>
+    </task>
+    <task id="LOCAL-00009" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764338276025</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1764338276025</updated>
+    </task>
+    <task id="LOCAL-00010" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764348031780</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1764348031780</updated>
+    </task>
+    <task id="LOCAL-00011" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764424485207</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1764424485207</updated>
+    </task>
+    <task id="LOCAL-00012" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764427827651</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1764427827651</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="redo" />
+    <MESSAGE value="tes" />
+    <option name="LAST_COMMIT_MESSAGE" value="tes" />
+  </component>
+</project>
