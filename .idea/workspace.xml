@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="tes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ui/UnitCard.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/UnitCard.js" afterDir="false" />
     </list>
@@ -83,7 +82,7 @@
       <workItem from="1764324415694" duration="29349000" />
       <workItem from="1764432948113" duration="689000" />
       <workItem from="1764479854635" duration="4255000" />
-      <workItem from="1764490020861" duration="3947000" />
+      <workItem from="1764490020861" duration="4842000" />
     </task>
     <task id="LOCAL-00001" summary="redo">
       <option name="closed" value="true" />
@@ -213,7 +212,15 @@
       <option name="project" value="LOCAL" />
       <updated>1764490036869</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764494772655</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1764494772655</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
