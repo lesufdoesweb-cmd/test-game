@@ -6,11 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="f2c8cf67-235e-4d9a-a32f-908d1d8e6eca" name="Changes" comment="tes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/assets/backgrounds/main_menu_flag.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets/backgrounds/main_menu_flag.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scenes/NewMainMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/NewMainMenu.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scenes/Preloader.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/Preloader.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/scenes/SquadUpgrade.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/assets/backgrounds/modal_recruits.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/assets/backgrounds/modal_recruits.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/RecruitPopup.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/RecruitPopup.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ui/RecruitUnitCard.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/ui/RecruitUnitCard.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,7 +83,7 @@
       <workItem from="1764324415694" duration="29349000" />
       <workItem from="1764432948113" duration="689000" />
       <workItem from="1764479854635" duration="4255000" />
-      <workItem from="1764490020861" duration="12546000" />
+      <workItem from="1764490020861" duration="13598000" />
     </task>
     <task id="LOCAL-00001" summary="redo">
       <option name="closed" value="true" />
@@ -279,7 +277,15 @@
       <option name="project" value="LOCAL" />
       <updated>1764521265857</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="tes">
+      <option name="closed" value="true" />
+      <created>1764530144018</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1764530144018</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

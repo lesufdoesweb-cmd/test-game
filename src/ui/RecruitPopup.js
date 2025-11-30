@@ -16,7 +16,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         this.VIEWPORT_HEIGHT = 300; // Visible height for cards
         this.CARD_WIDTH = 80 * 1;
         this.CARD_HEIGHT = 120 * 1;
-        this.SPACING = 15;
+        this.SPACING = 50;
 
         // Grey overlay
         this.overlay = scene.add.graphics({ fillStyle: { color: 0x000000, alpha: 0.7 } });
@@ -29,7 +29,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         this.popupBg.setScale(1.7);
         this.add(this.popupBg);
 
-        const banner = this.scene.add.image(width / 2, this.popupBg.y - (this.popupBg.height * 1.7) / 2 - 60, 'banner_recruit_screen');
+        const banner = this.scene.add.image(width / 2, this.popupBg.y - (this.popupBg.height * 1.7) / 2 - 30, 'banner_recruit_screen');
         banner.setScale(1.5);
         this.add(banner);
 
@@ -45,6 +45,8 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         // Calculate positioning relative to BG
         const bgTop = this.popupBg.y - (this.popupBg.height * 1.7) / 2;
         const bgLeft = this.popupBg.x - (this.popupBg.width * 1.7) / 2;
+        const bgBottom = this.popupBg.y + (this.popupBg.height * 1.7) / 2;
+        const bgRight = this.popupBg.x + (this.popupBg.width * 1.7) / 2;
 
         // Title - REMOVED
         // this.title = scene.add.bitmapText(width / 2, bgTop + 60, 'editundo_55', 'RECRUIT', 28).setOrigin(0.5);
@@ -57,7 +59,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         this.add(this.closeButton);
 
         // Beer currency display
-        this.beerContainer = this.createBeerDisplay(width / 2, bgTop + 60);
+        this.beerContainer = this.createBeerDisplay(bgLeft + 90, bgBottom + 30);
         this.add(this.beerContainer);
 
         // Container for scrolling cards
@@ -65,7 +67,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         this.add(this.cardsContainer);
 
         // Button (Initially hidden/disabled logic handled in update)
-        this.confirmButton = this.createUIButton(width / 2, this.popupBg.y + (this.popupBg.height * 1.7)/2 - 60, 'SELECT', () => this.onConfirmClick());
+        this.confirmButton = this.createUIButton(bgRight - 90, bgBottom + 30, 'SELECT', () => this.onConfirmClick());
         this.add(this.confirmButton);
 
         // Initialize State
@@ -140,7 +142,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
 
         // IMPORTANT: Calculate the actual height of the content inside the container
         const totalRows = Math.ceil(sortedPlayerUnits.length / columns);
-        this.contentHeight = totalRows * (this.CARD_HEIGHT + this.SPACING);
+        this.contentHeight = totalRows * (this.CARD_HEIGHT + this.SPACING) + 200;
 
         // We set the size of the container to help with debugging/logic, though Phaser containers don't auto-clip
         this.cardsContainer.setSize(this.VIEWPORT_WIDTH, this.contentHeight);
@@ -151,7 +153,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         // The mask defines the visible window.
         // We position it relative to where we want the "view" to be.
         const maskX = this.popupBg.x - this.VIEWPORT_WIDTH / 2;
-        const maskY = this.popupBg.y - 120; // Adjust this to move the window up/down
+        const maskY = this.popupBg.y - 175; // Adjust this to move the window up/down
 
         const maskGraphics = this.scene.make.graphics();
         maskGraphics.fillStyle(0xffffff);
@@ -161,9 +163,9 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
         this.cardsContainer.setMask(mask);
 
         // 2. Scrollbar Track
-        const trackX = this.popupBg.x + 220; // To the right of the cards
-        const trackY = maskY;
-        const trackHeight = this.VIEWPORT_HEIGHT + 50;
+        const trackX = this.popupBg.x + 230; // To the right of the cards
+        const trackY = maskY + 45;
+        const trackHeight = this.VIEWPORT_HEIGHT - 15;
 
         this.scrollTrack = this.scene.add.graphics({fillStyle: {color: 0x4d2c1d}});
         this.scrollTrack.fillRect(trackX, trackY, 10, trackHeight);
@@ -171,12 +173,12 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
 
         // 3. Scrollbar Thumb
         this.scrollbar = this.scene.add.graphics({fillStyle: {color: 0x86593f}});
-        this.scrollbar.fillRect(0, 0, 14, 50);
+        this.scrollbar.fillRect(0, 0, 8, 40);
         this.scrollbar.x = trackX - 2;
         this.scrollbar.y = trackY;
         this.add(this.scrollbar);
 
-        this.scrollbar.setInteractive(new Phaser.Geom.Rectangle(0, 0, 14, 50), Phaser.Geom.Rectangle.Contains);
+        this.scrollbar.setInteractive(new Phaser.Geom.Rectangle(0, 0, 8, 40), Phaser.Geom.Rectangle.Contains);
         this.scene.input.setDraggable(this.scrollbar);
 
         // Store scroll limits
@@ -309,7 +311,7 @@ export class RecruitPopup extends Phaser.GameObjects.Container {
 
     createUIButton(x, y, text, onClick) {
         const container = this.scene.add.container(x, y);
-        container.setScale(0.3);
+        container.setScale(0.4);
 
         const background = this.scene.add.image(0, 0, ASSETS.image.button_background.key);
         const label = this.scene.add.bitmapText(0, 0, 'editundo_55', text, 55).setOrigin(0.5);

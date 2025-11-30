@@ -12,7 +12,7 @@ export class RecruitUnitCard {
         this.isSelected = false;
 
         // Scaling
-        this.currentScale = 1;
+        this.currentScale = 1.5;
 
         this.idleTween = null;
         this.hoverTween = null;
