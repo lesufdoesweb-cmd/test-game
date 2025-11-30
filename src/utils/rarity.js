@@ -7,3 +7,24 @@ export function getBoostedStats(baseStats, rarity) {
     return newStats;
 }
 
+export function calculateStatsForStars(baseStats, stars) {
+    if (!stars || stars <= 1) {
+        const newStats = { ...baseStats };
+        newStats.currentHealth = newStats.maxHealth;
+        return newStats;
+    }
+
+    const multiplier = Math.pow(2, stars - 1);
+    const newStats = { ...baseStats };
+
+    const statsToBoost = ['maxHealth', 'physicalDamage', 'magicDamage'];
+
+    statsToBoost.forEach(key => {
+        if (newStats[key]) {
+            newStats[key] = Math.round(newStats[key] * multiplier);
+        }
+    });
+
+    newStats.currentHealth = newStats.maxHealth;
+    return newStats;
+}

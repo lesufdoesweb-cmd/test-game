@@ -5,6 +5,7 @@ import {Chest} from '../gameObjects/Chest.js';
 import {NPC} from '../gameObjects/NPC.js';
 import {UNIT_TYPES} from "../gameObjects/unitTypes.js";
 import {ABILITIES} from "../gameObjects/abilities.js";
+import {calculateStatsForStars} from "../utils/rarity.js";
 import {Projectile} from "../gameObjects/Projectile.js";
 import {testMap} from "../battle_maps/test_map.js";
 import {testArmy} from "../enemy_armies/test_army.js";
@@ -270,7 +271,7 @@ export class Game extends Phaser.Scene {
                     if (unitType) {
                         const stars = obj.stars || 1;
                         // Deep copy stats and moves to prevent shared references
-                        const stats = this.calculateStatsForStars(unitType.stats, stars);
+                        const stats = calculateStatsForStars(unitType.stats, stars);
                         const moves = unitType.moves.map(abilityKey => {
                             const abilityTemplate = ABILITIES[abilityKey];
                             const move = { ...abilityTemplate };
@@ -577,28 +578,6 @@ export class Game extends Phaser.Scene {
 
         // --- RESTORED: Trigger Entrance Animation ---
         this.animateSceneEntry();
-    }
-
-    calculateStatsForStars(baseStats, stars) {
-        if (!stars || stars <= 1) {
-            const newStats = { ...baseStats };
-            newStats.currentHealth = newStats.maxHealth;
-            return newStats;
-        }
-
-        const multiplier = Math.pow(2, stars - 1);
-        const newStats = { ...baseStats };
-
-        const statsToBoost = ['maxHealth', 'physicalDamage', 'magicDamage'];
-
-        statsToBoost.forEach(key => {
-            if (newStats[key]) {
-                newStats[key] = Math.round(newStats[key] * multiplier);
-            }
-        });
-
-        newStats.currentHealth = newStats.maxHealth;
-        return newStats;
     }
 
     isTileFree(x, y) {
