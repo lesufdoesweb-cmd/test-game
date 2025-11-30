@@ -1,18 +1,17 @@
 import ASSETS from '../assets.js';
 import { UNIT_TYPES } from '../gameObjects/unitTypes.js';
 import { UnitCard } from '../ui/UnitCard.js';
-import { getBoostedStats, rarityTiers } from "../utils/rarity.js";
+import { getBoostedStats } from "../utils/rarity.js";
 import { levelArmies } from "../enemy_armies/levels/index.js";
 
 export class SquadUpgrade extends Phaser.Scene {
     constructor() {
         super('SquadUpgrade');
-        this.shopCards = [null, null, null];
+        this.shopCards = Array(5).fill(null);
         this.armySlots = [];
         this.stashSlots = [];
         this.isAnimating = false;
 
-        this.rarityTiers = rarityTiers;
         this.currentDraggingCard = null;
         this.costDisplay = null;
 
@@ -27,7 +26,7 @@ export class SquadUpgrade extends Phaser.Scene {
     }
 
     create() {
-        this.shopCards = [null, null, null];
+        this.shopCards = Array(5).fill(null);
         this.armySlots = [];
         this.stashSlots = [];
 
@@ -75,12 +74,13 @@ export class SquadUpgrade extends Phaser.Scene {
         if (savedUnitData.unit) return savedUnitData;
         const unit = UNIT_TYPES[savedUnitData.unitName];
         const stats = getBoostedStats(unit.stats, savedUnitData.rarity);
-        return { unit, rarity: savedUnitData.rarity, stats, unitName: savedUnitData.unitName };
+        const stars = savedUnitData.stars || 1;
+        return { unit, rarity: savedUnitData.rarity, stats, unitName: savedUnitData.unitName, stars: stars };
     }
 
     _setupUI(width, height) {
         // Background
-        const bgImage = this.add.image(width / 2, height / 2, ASSETS.image.bg_char_selection.key);
+        const bgImage = this.add.image(width / 2, height / 2, ASSETS.image.shop_screen_bg.key);
         bgImage.setScale(Math.max(width / bgImage.width, height / bgImage.height)).setDepth(0);
 
         // --- TOP UI ---
@@ -93,6 +93,8 @@ export class SquadUpgrade extends Phaser.Scene {
 
         const titleText = this.isFirstTime ? 'SQUAD SELECTION' : 'SQUAD UPGRADES';
         this.purchaseLimitText = this.add.bitmapText(width / 2, 100, 'editundo_55', titleText, 28).setOrigin(0.5).setDepth(2);
+
+        this.add.bitmapText(width / 2, 170, 'editundo_55', 'SHOP', 28).setOrigin(0.5).setDepth(2);
 
         // --- SLOTS LAYOUT ---
         this.createArmySlots(width, height);
@@ -378,12 +380,13 @@ export class SquadUpgrade extends Phaser.Scene {
         let card = this.shopCards.find(c => c && c.cardContainer === container);
         if (card) return card;
 
-        [...this.armySlots, ...this.stashSlots].forEach(slot => {
-            if (slot.unitCard && slot.unitCard.cardContainer === container) {
-                card = slot.unitCard;
-            }
-        });
-        return card;
+        const allSlots = [...this.armySlots, ...this.stashSlots];
+        const slotWithCard = allSlots.find(slot => slot.unitCard && slot.unitCard.cardContainer === container);
+
+        if (slotWithCard) {
+            return slotWithCard.unitCard;
+        }
+        return undefined;
     }
 
     handleDragEnter(pointer, gameObject, dropZone) {
@@ -437,10 +440,11 @@ export class SquadUpgrade extends Phaser.Scene {
         const allSlots = [...this.armySlots, ...this.stashSlots];
         const unitsMap = {};
 
+        // Group units by name and star level
         allSlots.forEach(slot => {
             if (slot.unitCard) {
                 const u = slot.unitCard.config;
-                const key = `${u.unitName}_${u.rarity}`;
+                const key = `${u.unitName}_${u.stars}`; // e.g., "Archer_1"
                 if (!unitsMap[key]) unitsMap[key] = [];
                 unitsMap[key].push(slot);
             }
@@ -449,38 +453,42 @@ export class SquadUpgrade extends Phaser.Scene {
         for (const key in unitsMap) {
             if (unitsMap[key].length >= 3) {
                 const slotsToMerge = unitsMap[key].slice(0, 3);
-                const firstSlot = slotsToMerge[0];
+                const firstSlot = slotsToMerge[0]; // The merged unit will appear here
 
-                const { unitName, rarity } = firstSlot.unitCard.config;
-                const nextRarity = this.rarityTiers[rarity].next;
+                const { unitName, stars, rarity } = firstSlot.unitCard.config;
+                const newStars = stars + 1;
 
-                if (nextRarity) {
-                    console.log(`Merging 3 ${rarity} ${unitName} into 1 ${nextRarity}`);
+                console.log(`Merging 3 ${stars}-star ${unitName} into 1 ${newStars}-star`);
 
-                    const unit = UNIT_TYPES[unitName];
-                    const stats = getBoostedStats(unit.stats, nextRarity);
-                    const newConfig = { unit, rarity: nextRarity, stats, unitName };
+                const unit = UNIT_TYPES[unitName];
+                // Stats are not boosted here anymore, they are calculated in Game.js
+                const newConfig = { unit, rarity, stats: unit.stats, unitName, stars: newStars };
 
-                    slotsToMerge.forEach(slot => {
-                        const card = slot.unitCard;
-                        slot.unitCard = null;
-                        if(card) {
-                            this.time.delayedCall(0, () => card.destroy());
-                        }
-                    });
+                // Remove the old cards
+                slotsToMerge.forEach(slot => {
+                    const card = slot.unitCard;
+                    slot.unitCard = null;
+                    if(card) {
+                        this.time.delayedCall(0, () => card.destroy());
+                    }
+                });
 
-                    this.time.delayedCall(50, () => {
-                        this.createCardInSlot(firstSlot, newConfig);
-                        this.sound.play('select_sound');
-                        this.checkForCombinations();
-                    });
+                // Create the new upgraded card
+                this.time.delayedCall(50, () => {
+                    this.createCardInSlot(firstSlot, newConfig);
+                    // this.sound.play('select_sound');
+                    // Check again in case the new card forms another trio
+                    this.checkForCombinations();
+                });
 
-                    return;
-                }
+                // A merge happened, so we return to prevent multiple merges in one frame
+                return;
             }
         }
 
+        // If no merge happened, just update the registry
         this.updateRegistryData();
+        this.updateButtonStates();
     }
 
     updateRegistryData() {
@@ -493,18 +501,20 @@ export class SquadUpgrade extends Phaser.Scene {
 
     generateCards(isFirstSpawn = false) {
         const unitKeys = Object.keys(UNIT_TYPES).filter(key => UNIT_TYPES[key].isPlayer);
-        const startX = 100;
-        const gap = 130;
+        const numShopCards = 5;
+        const gap = 130; // Center-to-center distance between cards
+        const totalSpread = (numShopCards - 1) * gap; // Total distance from first card's center to last card's center
+        const startX = (this.scale.width / 2) - (totalSpread / 2) - 110; // Center X of the first card
         const yPos = 220; // Moved higher (was 260)
 
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < numShopCards; i++) {
             if (this.shopCards[i] === null) {
-                const rarity = this.getRandomRarity();
                 const randomUnitKey = unitKeys[Math.floor(Math.random() * unitKeys.length)];
                 const unit = UNIT_TYPES[randomUnitKey];
+                const rarity = unit.rarity;
                 const stats = getBoostedStats(unit.stats, rarity);
 
-                const cardConfig = { unit, rarity, stats, unitName: randomUnitKey, isShopCard: true };
+                const cardConfig = { unit, rarity, stats, unitName: randomUnitKey, isShopCard: true, stars: 1 };
 
                 const card = new UnitCard(this, startX + i * gap, yPos, cardConfig);
                 this.shopCards[i] = card;
@@ -526,13 +536,12 @@ export class SquadUpgrade extends Phaser.Scene {
         this.updateGoldDisplay();
         this.isAnimating = true;
 
-        this.shopCards.forEach(card => {
-            if (card) card.destroy();
-        });
-        this.shopCards = [null, null, null];
-
-        this.generateCards(false);
-        this.time.delayedCall(500, () => { this.isAnimating = false; });
+            this.shopCards.forEach(card => {
+                if (card) card.destroy();
+            });
+            this.shopCards = Array(5).fill(null);
+        
+            this.generateCards(false);        this.time.delayedCall(500, () => { this.isAnimating = false; });
         this.updateButtonStates();
     }
 
@@ -546,7 +555,7 @@ export class SquadUpgrade extends Phaser.Scene {
         }
 
         const armyCount = this.armySlots.filter(s => s.unitCard).length;
-        const requiredUnits = this.isFirstTime ? 3 : 1;
+        const requiredUnits = 1;
 
         if (armyCount >= requiredUnits) {
             this.startBattleBtn.alpha = 1;
@@ -561,16 +570,10 @@ export class SquadUpgrade extends Phaser.Scene {
 
     updatePurchaseLimitText() {
         const armyCount = this.armySlots.filter(s => s.unitCard).length;
-        if (this.isFirstTime) {
-            const requiredUnits = 3;
-            const remaining = requiredUnits - armyCount;
-            if (remaining > 0) {
-                this.purchaseLimitText.setText(`Select ${remaining} more unit(s)`);
-            } else {
-                this.purchaseLimitText.setText('Your squad is ready!');
-            }
+        if (armyCount >= 1) {
+            this.purchaseLimitText.setText('Ready for Battle!');
         } else {
-            this.purchaseLimitText.setText('SQUAD UPGRADES');
+            this.purchaseLimitText.setText('Need 1 more unit in active army.');
         }
     }
 
@@ -624,19 +627,5 @@ export class SquadUpgrade extends Phaser.Scene {
         }
     }
 
-    getRandomRarity() {
-        const rarities = [
-            { name: 'common', weight: 60 },
-            { name: 'rare', weight: 25 },
-            { name: 'epic', weight: 10 },
-            { name: 'legendary', weight: 5 },
-        ];
-        const totalWeight = rarities.reduce((acc, r) => acc + r.weight, 0);
-        let random = Math.random() * totalWeight;
-        for (const rarity of rarities) {
-            if (random < rarity.weight) return rarity.name;
-            random -= rarity.weight;
-        }
-        return 'common';
-    }
+
 }

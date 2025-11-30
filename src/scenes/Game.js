@@ -105,6 +105,7 @@ export class Game extends Phaser.Scene {
                     type: 'unit',
                     unitType: unitData.unitName,
                     rarity: unitData.rarity,
+                    stars: unitData.stars || 1,
                     position: playerSpawnPoints[index]
                 });
             }
@@ -120,11 +121,13 @@ export class Game extends Phaser.Scene {
                 // Support both string format and object format for enemies
                 const unitType = typeof unitData === 'string' ? unitData : unitData.unitName;
                 const rarity = typeof unitData === 'string' ? 'common' : (unitData.rarity || 'common');
+                const stars = typeof unitData === 'string' ? 1 : (unitData.stars || 1);
 
                 combinedObjects.push({
                     type: 'unit',
                     unitType: unitType,
                     rarity: rarity,
+                    stars: stars,
                     position: enemySpawnPoints[index],
                     isPlayer: false,
                 });
@@ -265,8 +268,9 @@ export class Game extends Phaser.Scene {
                 case 'unit':
                     const unitType = UNIT_TYPES[obj.unitType];
                     if (unitType) {
+                        const stars = obj.stars || 1;
                         // Deep copy stats and moves to prevent shared references
-                        const stats = { ...unitType.stats };
+                        const stats = this.calculateStatsForStars(unitType.stats, stars);
                         const moves = unitType.moves.map(abilityKey => {
                             const abilityTemplate = ABILITIES[abilityKey];
                             const move = { ...abilityTemplate };
@@ -285,17 +289,9 @@ export class Game extends Phaser.Scene {
                             stats: stats,
                             moves: moves,
                             isPlayer: obj.isPlayer !== undefined ? obj.isPlayer : unitType.isPlayer,
-                            rarity: obj.rarity 
+                            rarity: obj.rarity,
+                            stars: stars
                         });
-
-                        // Add rarity glow
-                        if (unit.rarity === 'rare') {
-                            unit.sprite.postFX.addGlow(0x0000ff, 2, 0, false, 0.1, 10);
-                        } else if (unit.rarity === 'epic') {
-                            unit.sprite.postFX.addGlow(0x9400D3, 2, 0, false, 0.1, 10);
-                        } else if (unit.rarity === 'legendary') {
-                            unit.sprite.postFX.addGlow(0xffd700, 2, 0, false, 0.1, 10);
-                        }
 
                         this.units.push(unit);
                         if (unit.isPlayer) {
@@ -581,6 +577,28 @@ export class Game extends Phaser.Scene {
 
         // --- RESTORED: Trigger Entrance Animation ---
         this.animateSceneEntry();
+    }
+
+    calculateStatsForStars(baseStats, stars) {
+        if (!stars || stars <= 1) {
+            const newStats = { ...baseStats };
+            newStats.currentHealth = newStats.maxHealth;
+            return newStats;
+        }
+
+        const multiplier = Math.pow(2, stars - 1);
+        const newStats = { ...baseStats };
+
+        const statsToBoost = ['maxHealth', 'physicalDamage', 'magicDamage'];
+
+        statsToBoost.forEach(key => {
+            if (newStats[key]) {
+                newStats[key] = Math.round(newStats[key] * multiplier);
+            }
+        });
+
+        newStats.currentHealth = newStats.maxHealth;
+        return newStats;
     }
 
     isTileFree(x, y) {

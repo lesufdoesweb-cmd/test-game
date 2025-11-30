@@ -190,6 +190,10 @@ export default {
             key: 'bg_char_selection',
             args: ['src/assets/backgrounds/bg_char_selection.png']
         },
+        shop_screen_bg: {
+            key: 'shop_screen_bg',
+            args: ['src/assets/backgrounds/shop_screen_bg.png']
+        },
         unit_card_common: {
             key: 'unit_card_common',
             args: ['src/assets/user_interface/unit_card_common.png']

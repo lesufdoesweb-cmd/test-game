@@ -21,7 +21,7 @@ export const UNIT_TYPES = {
     },
     'Orc': {
         name: 'Orc',
-        isPlayer: false,
+        isPlayer: true,
         textureKey: 'ork',
         rarity: 'common',
         stats: {
@@ -38,7 +38,7 @@ export const UNIT_TYPES = {
     },
     'Spider': {
         name: 'Spider',
-        isPlayer: false,
+        isPlayer: true,
         textureKey: 'spider',
         rarity: 'common',
         stats: {
@@ -74,7 +74,7 @@ export const UNIT_TYPES = {
         name: 'Paladin',
         isPlayer: true,
         textureKey: 'paladin',
-        rarity: 'common',
+        rarity: 'rare',
         stats: {
             maxHealth: 180,
             currentHealth: 180,
@@ -91,7 +91,7 @@ export const UNIT_TYPES = {
         name: 'Wizard',
         isPlayer: true,
         textureKey: 'wizard',
-        rarity: 'common',
+        rarity: 'rare',
         stats: {
             maxHealth: 70,
             currentHealth: 70,
