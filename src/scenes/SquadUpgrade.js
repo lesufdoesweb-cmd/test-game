@@ -123,13 +123,13 @@ export class SquadUpgrade extends Phaser.Scene {
     }
 
     createArmySlots(width, height) {
-        this.add.bitmapText(width / 2, height - 200, 'editundo_55', 'ACTIVE SQUAD', 20).setOrigin(0.5).setTint(0xaaaaaa);
+        this.add.bitmapText(width / 2 - 150, height - 200, 'editundo_55', 'ACTIVE SQUAD', 20).setOrigin(0.5).setTint(0xaaaaaa);
 
         const slotCount = 6;
         const spacing = 15;
         const cardWidth = 80 * this.ARMY_SCALE;
         const totalWidth = (slotCount * cardWidth) + ((slotCount - 1) * spacing);
-        const startX = (width / 2) - (totalWidth / 2) + (cardWidth / 2);
+        const startX = (width / 2) - (totalWidth / 2) + (cardWidth / 2) - 100;
         const slotY = height - 110;
 
         for (let i = 0; i < slotCount; i++) {
@@ -167,7 +167,7 @@ export class SquadUpgrade extends Phaser.Scene {
         const startX = labelX;
         const startY = (height / 2) + 50;
 
-        this.add.bitmapText(labelX, startY - (totalH/2) - 30, 'editundo_55', 'RESERVES', 20).setOrigin(0.5).setTint(0xaaaaaa);
+        this.add.bitmapText(labelX, startY - (totalH/2) - 30, 'editundo_55', 'STASH', 20).setOrigin(0.5).setTint(0xaaaaaa);
 
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < columns; col++) {
