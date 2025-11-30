@@ -1,7 +1,7 @@
 import ASSETS from '../assets.js';
 import { UNIT_TYPES } from '../gameObjects/unitTypes.js';
 import { UnitCard } from '../ui/UnitCard.js';
-import { getBoostedStats } from "../utils/rarity.js";
+import { getBoostedStats, calculateStatsForStars } from "../utils/rarity.js";
 import { levelArmies } from "../enemy_armies/levels/index.js";
 
 export class SquadUpgrade extends Phaser.Scene {
@@ -73,7 +73,7 @@ export class SquadUpgrade extends Phaser.Scene {
     _normalizeUnitData(savedUnitData) {
         if (savedUnitData.unit) return savedUnitData;
         const unit = UNIT_TYPES[savedUnitData.unitName];
-        const stats = getBoostedStats(unit.stats, savedUnitData.rarity);
+        const stats = calculateStatsForStars(unit.stats, stars);
         const stars = savedUnitData.stars || 1;
         return { unit, rarity: savedUnitData.rarity, stats, unitName: savedUnitData.unitName, stars: stars };
     }
@@ -86,8 +86,20 @@ export class SquadUpgrade extends Phaser.Scene {
         // --- TOP UI ---
         this.refreshBtn = this.createUIButton(100, 60, 'Refresh', this.handleRefresh);
 
-        this.goldIcon = this.add.image(this.refreshBtn.x + 100, 60, ASSETS.image.coin.key).setScale(0.7).setDepth(2);
-        this.goldText = this.add.bitmapText(this.goldIcon.x + 30, 60, 'editundo_23', `${this.playerGold}`, 24).setOrigin(0, 0.5).setDepth(2);
+        const goldDisplayX = this.refreshBtn.x + 100;
+
+        // Create a container for the gold display
+        this.goldDisplayContainer = this.add.container(goldDisplayX, 60).setDepth(2);
+
+        // Add background
+        const bgGold = this.add.image(0, 0, ASSETS.image.button_background.key).setScale(0.8, 0.6);
+        this.goldDisplayContainer.add(bgGold);
+
+        this.goldIcon = this.add.image(-30, 0, ASSETS.image.coin.key).setScale(0.7);
+        this.goldDisplayContainer.add(this.goldIcon);
+
+        this.goldText = this.add.bitmapText(0, 0, 'editundo_23', `${this.playerGold}`, 24).setOrigin(0, 0.5);
+        this.goldDisplayContainer.add(this.goldText);
 
         this.startBattleBtn = this.createUIButton(width - 150, 60, 'Start Battle', this.handleStartBattle);
 
@@ -462,7 +474,7 @@ export class SquadUpgrade extends Phaser.Scene {
 
                 const unit = UNIT_TYPES[unitName];
                 // Stats are not boosted here anymore, they are calculated in Game.js
-                const newConfig = { unit, rarity, stats: unit.stats, unitName, stars: newStars };
+                const newConfig = { unit, rarity, stats: calculateStatsForStars(unit.stats, newStars), unitName, stars: newStars };
 
                 // Remove the old cards
                 slotsToMerge.forEach(slot => {
@@ -512,7 +524,7 @@ export class SquadUpgrade extends Phaser.Scene {
                 const randomUnitKey = unitKeys[Math.floor(Math.random() * unitKeys.length)];
                 const unit = UNIT_TYPES[randomUnitKey];
                 const rarity = unit.rarity;
-                const stats = getBoostedStats(unit.stats, rarity);
+                const stats = calculateStatsForStars(unit.stats, 1);
 
                 const cardConfig = { unit, rarity, stats, unitName: randomUnitKey, isShopCard: true, stars: 1 };
 
