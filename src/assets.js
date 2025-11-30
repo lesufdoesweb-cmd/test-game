@@ -209,6 +209,22 @@ export default {
         refresh_button: {
             key: 'refresh_button',
             args: ['src/assets/user_interface/refresh_button.png']
+        },
+        star: {
+            key: 'star',
+            args: ['src/assets/backgrounds/star.png']
+        },
+        star_empty: {
+            key: 'star_empty',
+            args: ['src/assets/backgrounds/star_empty.png']
+        },
+        card_slot: {
+            key: 'card_slot',
+            args: ['src/assets/user_interface/card_slot.png']
+        },
+        coin: {
+            key: 'coin',
+            args: ['src/assets/backgrounds/coin.png']
         }
     },
     'spritesheet': {

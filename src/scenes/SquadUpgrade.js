@@ -11,14 +11,21 @@ export class SquadUpgrade extends Phaser.Scene {
         this.playerArmy = []; // This will hold UnitCard objects
         this.armySlots = [];
         this.isAnimating = false;
-        this.unitsPurchased = 0;
 
         this.rarityTiers = rarityTiers;
+        this.currentDraggingCard = null; // To keep track of the card being dragged
+        this.stash = []; // New array to hold cards in stash
+
+        // Define economic constants
+        this.SHOP_CARD_BUY_COST = 3;
+        this.REFRESH_COST = 2;
+        this.SELL_RETURN = 2;
     }
 
     create() {
         this.shopCards = [];
         this.armySlots = [];
+        this.stashSlots = []; // Initialize stash slots
 
         this.createPlaceholderTextures();
         const { width, height } = this.scale;
@@ -27,35 +34,39 @@ export class SquadUpgrade extends Phaser.Scene {
         this.level = this.registry.get('level') || 1;
         this.initialPlayerArmyData = this.registry.get('playerArmy') || [];
         this.isFirstTime = this.registry.get('isFirstTime');
-        this.shopRefreshes = this.registry.get('shopRefreshes');
+        this.playerGold = this.registry.get('playerGold') || 15;
+
 
         // --- Fix Duplication Bug & Initialize Army ---
         this.playerArmy = this.initialPlayerArmyData.map(savedUnitData => {
+            if (savedUnitData.unit) { // if it is old structure
+                return savedUnitData;
+            }
             const unit = UNIT_TYPES[savedUnitData.unitName];
             const stats = getBoostedStats(unit.stats, savedUnitData.rarity);
             return { unit, rarity: savedUnitData.rarity, stats, unitName: savedUnitData.unitName };
         });
-        this.unitsPurchased = 0;
+        this.stash = []; // Initialize stash
+        this.stashArmyData = this.registry.get('stash') || [];
+        this.stash = this.stashArmyData.map(savedUnitData => {
+            if (savedUnitData.unit) { // if it is old structure
+                return savedUnitData;
+            }
+            const unit = UNIT_TYPES[savedUnitData.unitName];
+            const stats = getBoostedStats(unit.stats, savedUnitData.rarity);
+            return { unit, rarity: savedUnitData.rarity, stats, unitName: savedUnitData.unitName };
+        });
 
-        // --- UI ---
-        const bgImage = this.add.image(width / 2, height / 2, ASSETS.image.bg_char_selection.key);
-        bgImage.setScale(Math.max(width / bgImage.width, height / bgImage.height)).setDepth(0);
+        this._setupUI(width, height);
 
-        const titleText = this.isFirstTime ? 'SQUAD SELECTION' : 'SQUAD UPGRADES';
-        this.purchaseLimitText = this.add.bitmapText(width / 2, 50, 'editundo_55', titleText, 28).setOrigin(0.5).setDepth(2);
+        // this.unitsPurchased = 0; // This needs to be reset for each battle
         
-        this.createArmySlots(width, height);
-
-        this.refreshBtn = this.createUIButton(150, 50, 'Refresh', this.handleRefresh);
-        this.startBattleBtn = this.createUIButton(width - 150, 50, 'Start Battle', this.handleStartBattle);
-
-        this.refreshText = this.add.bitmapText(this.refreshBtn.x, this.refreshBtn.y + 30, 'editundo_23', `Refreshes: ${this.shopRefreshes}`, 18).setOrigin(0.5);
-        
-
         this.displayArmy();
+        this.displayStash();
         this.checkForCombinations();
         this.updateButtonStates();
         this.updatePurchaseLimitText();
+        this.updateGoldDisplay(); // Call new method to update gold display
         this.generateCards(true);
     }
 
@@ -109,32 +120,118 @@ export class SquadUpgrade extends Phaser.Scene {
         return container;
     }
 
+    _setupUI(width, height) {
+        const bgImage = this.add.image(width / 2, height / 2, ASSETS.image.bg_char_selection.key);
+        bgImage.setScale(Math.max(width / bgImage.width, height / bgImage.height)).setDepth(0);
+
+        const titleText = this.isFirstTime ? 'SQUAD SELECTION' : 'SQUAD UPGRADES';
+        this.purchaseLimitText = this.add.bitmapText(width / 2, 50, 'editundo_55', titleText, 28).setOrigin(0.5).setDepth(2);
+        
+        this.createArmySlots(width, height);
+        this.createStashSlots(width, height);
+
+        // Refresh Button
+        this.refreshBtn = this.createUIButton(150, 50, 'Refresh', this.handleRefresh);
+        this.refreshBtn.y = height - 50; // Position at bottom left
+
+        // Gold Display (aligned with refresh button)
+        this.goldIcon = this.add.image(this.refreshBtn.x - 50, this.refreshBtn.y, ASSETS.image.coin.key)
+            .setScale(0.7)
+            .setDepth(2);
+        this.goldText = this.add.bitmapText(this.refreshBtn.x - 20, this.refreshBtn.y, 'editundo_23', `${this.playerGold}`, 18)
+            .setOrigin(0.5)
+            .setDepth(2);
+        
+        // Start Battle Button
+        this.startBattleBtn = this.createUIButton(width - 150, 50, 'Start Battle', this.handleStartBattle);
+        this.startBattleBtn.y = height - 50; // Position at bottom right
+
+        // Sell Slot (initially hidden)
+        const sellSlotX = 100;
+        const sellSlotY = 220;
+        this.sellSlot = this.add.group();
+        const sellSlotImage = this.add.image(sellSlotX, sellSlotY, ASSETS.image.card_slot.key);
+        sellSlotImage.setScale(1.5);
+        sellSlotImage.setDepth(1);
+        sellSlotImage.setInteractive({ dropZone: true });
+        sellSlotImage.name = 'sell_slot';
+        const sellText = this.add.bitmapText(sellSlotX, sellSlotY, 'editundo_55', 'Sell', 28).setOrigin(0.5).setDepth(2);
+        this.sellSlot.add(sellSlotImage);
+        this.sellSlot.add(sellText);
+        this.sellSlot.setVisible(false);
+
+
+        // Drag and Drop Event Handlers
+        this.input.on('dragstart', this.handleDragStart, this);
+        this.input.on('drag', this.handleDrag, this);
+        this.input.on('drop', this.handleDrop, this);
+        this.input.on('dragend', this.handleDragEnd, this);
+    }
+
     createArmySlots(width, height) {
         const slotCount = 6;
-        const slotWidth = 100;
-        const startX = (width - (slotCount * slotWidth)) / 2 + slotWidth/2;
+        const spacing = 10; // Pixels between slots
+        const cardDisplayWidth = 80 * 1.5; // UnitCard base width * scale
+        const totalWidthOfCards = (slotCount * cardDisplayWidth) + ((slotCount - 1) * spacing);
+        const startXArmy = (width / 2) - (totalWidthOfCards / 2) + (cardDisplayWidth / 2);
+        const slotY = height - 120; // Y position for the bottom of the card
+
+        this.armySlots = [];
         for (let i = 0; i < slotCount; i++) {
-            const slotX = startX + i * slotWidth;
-            const slotY = height - 120;
-            this.armySlots.push({ x: slotX, y: slotY, unitCard: null });
+            const slotX = startXArmy + i * (cardDisplayWidth + spacing);
+            const slotImage = this.add.image(slotX, slotY, ASSETS.image.card_slot.key);
+            slotImage.setScale(1.5);
+            slotImage.setDepth(1);
+            slotImage.setInteractive({ dropZone: true });
+            slotImage.name = `army_slot_${i}`; // Give it a unique name for identification
+            this.armySlots.push({ x: slotX, y: slotY, unitCard: null, image: slotImage, index: i, type: 'army' });
+        }
+    }
+
+    createStashSlots(width, height) {
+        const slotCount = 6;
+        const columns = 2;
+        const rows = 3;
+        const spacingX = 10;
+        const spacingY = 10;
+        const cardDisplayWidth = 80 * 1.5;
+        const cardDisplayHeight = 120 * 1.5; // Assuming card height is 120, scaled to 1.5
+
+        const totalWidthStash = (columns * cardDisplayWidth) + ((columns - 1) * spacingX);
+        const totalHeightStash = (rows * cardDisplayHeight) + ((rows - 1) * spacingY);
+
+        const startXStash = width - (totalWidthStash / 2) - 50; // 50px from the right edge
+        const startYStash = (height / 2) - (totalHeightStash / 2); // Centered vertically
+
+        this.stashSlots = [];
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < columns; col++) {
+                const slotX = startXStash + col * (cardDisplayWidth + spacingX);
+                const slotY = startYStash + row * (cardDisplayHeight + spacingY);
+                const slotImage = this.add.image(slotX, slotY, ASSETS.image.card_slot.key);
+                slotImage.setScale(1.5);
+                slotImage.setDepth(1);
+                slotImage.setInteractive({ dropZone: true });
+                slotImage.name = `stash_slot_${row}_${col}`; // Unique name
+                this.stashSlots.push({ x: slotX, y: slotY, unitCard: null, image: slotImage, index: (row * columns) + col, type: 'stash' });
+            }
         }
     }
 
     generateCards(isFirstSpawn = false) {
         const unitKeys = Object.keys(UNIT_TYPES).filter(key => UNIT_TYPES[key].isPlayer);
-        const startX = 200;
-        const gap = 280;
+        const startX = 100;
+        const gap = 130;
 
         for (let i = 0; i < 3; i++) {
             const rarity = this.getRandomRarity();
             const randomUnitKey = unitKeys[Math.floor(Math.random() * unitKeys.length)];
             const unit = UNIT_TYPES[randomUnitKey];
             const stats = getBoostedStats(unit.stats, rarity);
-            const cardConfig = { unit, rarity, stats, unitName: randomUnitKey };
+            const cardConfig = { unit, rarity, stats, unitName: randomUnitKey, isShopCard: true }; // Added isShopCard
 
             if (isFirstSpawn) {
                 const card = new UnitCard(this, startX + i * gap, 220, cardConfig);
-                card.cardContainer.on('pointerdown', () => this.onCardSelected(card, i));
                 this.shopCards.push(card);
                 card.playSpawnAnimation(); // Manually trigger animation
             } else {
@@ -144,7 +241,6 @@ export class SquadUpgrade extends Phaser.Scene {
                     });
                 } else { // Card was purchased, create a new one, playing its spawn animation
                     const card = new UnitCard(this, startX + i * gap, 220, cardConfig);
-                    card.cardContainer.on('pointerdown', () => this.onCardSelected(card, i));
                     this.shopCards[i] = card;
                     // Play the spawn animation for the new card
                     this.time.delayedCall(i * 150, () => {
@@ -153,27 +249,6 @@ export class SquadUpgrade extends Phaser.Scene {
                 }
             }
         }
-    }
-
-    onCardSelected(card, index) {
-        if (this.isFirstTime) {
-            if (this.unitsPurchased >= 3) {
-                console.log("You can only have 3 units for your initial squad.");
-                return;
-            }
-        } else { // Not first time
-            if (this.unitsPurchased >= 1) {
-                console.log("You can only purchase 1 unit between battles.");
-                return;
-            }
-        }
-
-        this.unitsPurchased++;
-        this.addUnitToArmy(card.config);
-        card.destroy();
-        this.shopCards[index] = null; // Mark as purchased
-        this.updateButtonStates();
-        this.updatePurchaseLimitText();
     }
 
     addUnitToArmy(unitData, doCombineCheck = true) {
@@ -208,7 +283,27 @@ export class SquadUpgrade extends Phaser.Scene {
             if (i < this.armySlots.length) {
                 const slot = this.armySlots[i];
                 const card = new UnitCard(this, slot.x, slot.y, unitData);
-                card.cardContainer.setScale(2); // Make them smaller for the slots
+                card.cardContainer.setScale(1.5);
+                slot.unitCard = card;
+            }
+        });
+    }
+    
+    displayStash() {
+        // Clear existing display
+        this.stashSlots.forEach(slot => {
+            if (slot.unitCard) {
+                slot.unitCard.destroy();
+                slot.unitCard = null;
+            }
+        });
+
+        // Redraw stash
+        this.stash.forEach((unitData, i) => {
+            if (i < this.stashSlots.length) {
+                const slot = this.stashSlots[i];
+                const card = new UnitCard(this, slot.x, slot.y, unitData);
+                card.cardContainer.setScale(1.5);
                 slot.unitCard = card;
             }
         });
@@ -253,7 +348,7 @@ export class SquadUpgrade extends Phaser.Scene {
     updatePurchaseLimitText() {
         if (this.isFirstTime) {
             const requiredUnits = 3;
-            const remaining = requiredUnits - this.unitsPurchased;
+            const remaining = requiredUnits - this.playerArmy.length;
             if (remaining > 0) {
                 this.purchaseLimitText.setText(`Select ${remaining} more unit(s)`);
             } else {
@@ -264,22 +359,32 @@ export class SquadUpgrade extends Phaser.Scene {
         }
     }
 
+    updateGoldDisplay() {
+        this.goldText.setText(`${this.playerGold}`);
+    }
+
 
     handleRefresh() {
-        if (this.shopRefreshes > 0 && !this.isAnimating) {
-            this.isAnimating = true;
-            this.shopRefreshes--;
-            this.registry.set('shopRefreshes', this.shopRefreshes);
-            this.refreshText.setText(`Refreshes: ${this.shopRefreshes}`);
-            this.generateCards(false); // Pass false here
-            this.time.delayedCall(500, () => { this.isAnimating = false; });
-            this.updateButtonStates();
+        if (this.isAnimating) return;
+
+        if (this.playerGold < this.REFRESH_COST) {
+            console.log("Not enough gold to refresh!");
+            return;
         }
+
+        this.isAnimating = true;
+        this.playerGold -= this.REFRESH_COST;
+        this.registry.set('playerGold', this.playerGold);
+        this.updateGoldDisplay();
+
+        this.generateCards(false); // Pass false here
+        this.time.delayedCall(500, () => { this.isAnimating = false; });
+        this.updateButtonStates();
     }
 
     handleStartBattle() {
-        const armyToSave = this.playerArmy.map(u => ({ unitName: u.unitName, rarity: u.rarity }));
-        this.registry.set('playerArmy', armyToSave);
+        this.registry.set('playerArmy', this.playerArmy);
+        this.registry.set('stash', this.stash);
         this.registry.set('isFirstTime', false);
         this.registry.set('level', this.level);
 
@@ -287,12 +392,12 @@ export class SquadUpgrade extends Phaser.Scene {
         const randomEnemyArmy = enemyPool[Math.floor(Math.random() * enemyPool.length)];
 
         // Pass the army configuration, including rarity
-        this.scene.start('Game', { playerArmy: { units: armyToSave }, enemyArmy: randomEnemyArmy });
+        this.scene.start('Game', { playerArmy: { units: this.playerArmy }, enemyArmy: randomEnemyArmy });
     }
 
     updateButtonStates() {
         // Handle Refresh button
-        if (this.shopRefreshes > 0) {
+        if (this.playerGold >= this.REFRESH_COST) {
             this.refreshBtn.alpha = 1;
             this.refreshBtn.setInteractive({ useHandCursor: true });
         } else {
@@ -300,14 +405,186 @@ export class SquadUpgrade extends Phaser.Scene {
             this.refreshBtn.disableInteractive();
         }
 
-        const requiredUnits = this.isFirstTime ? 3 : 0;
-        if ((this.isFirstTime && this.unitsPurchased >= requiredUnits) || (!this.isFirstTime && this.playerArmy.length >= requiredUnits)) {
+        // Handle Start Battle button
+        const requiredUnits = this.isFirstTime ? 3 : 0; // If first time, require 3 units, otherwise 0 for now.
+        if (this.playerArmy.length >= requiredUnits) {
             this.startBattleBtn.alpha = 1;
             this.startBattleBtn.setInteractive({ useHandCursor: true });
         } else {
             this.startBattleBtn.alpha = 0.5;
             this.startBattleBtn.disableInteractive();
         }
+    }
+
+    handleDragStart(pointer, gameObject) {
+        // 'gameObject' is the UnitCard's cardContainer
+        this.children.bringToTop(gameObject);
+        this.currentDraggingCard = gameObject; // Store reference to the container
+
+        // Find the UnitCard instance associated with this container
+        const allCards = [...this.shopCards, ...this.armySlots.map(s => s.unitCard), ...this.stashSlots.map(s => s.unitCard)].filter(c => c);
+        const draggedUnitCard = allCards.find(card => card.cardContainer === gameObject);
+
+        if (draggedUnitCard) {
+            // Store original position to revert if drop is invalid
+            draggedUnitCard.originalX = gameObject.x;
+            draggedUnitCard.originalY = gameObject.y;
+
+            if (!draggedUnitCard.isShopCard) {
+                this.sellSlot.setVisible(true);
+            }
+        }
+    }
+
+    handleDrag(pointer, gameObject, dragX, dragY) {
+        gameObject.x = dragX;
+        gameObject.y = dragY;
+    }
+
+    handleDrop(pointer, gameObject, dropZone) {
+        // 'gameObject' is the UnitCard's cardContainer (the dragged item)
+        // 'dropZone' is the image of the slot (the drop target)
+
+        const draggedUnitCard = this.shopCards.find(card => card && card.cardContainer === gameObject) ||
+                               this.armySlots.find(slot => slot.unitCard && slot.unitCard.cardContainer === gameObject)?.unitCard ||
+                               this.stashSlots.find(slot => slot.unitCard && slot.unitCard.cardContainer === gameObject)?.unitCard;
+
+        if (!draggedUnitCard) {
+            console.log("Dragged object is not a UnitCard.");
+            return;
+        }
+
+        if (dropZone.name === 'sell_slot') {
+            this.playerGold += this.SELL_RETURN;
+            this.registry.set('playerGold', this.playerGold);
+            this.updateGoldDisplay();
+            this.updateButtonStates();
+
+            const originalSlot = this.armySlots.find(slot => slot.unitCard === draggedUnitCard) ||
+                                 this.stashSlots.find(slot => slot.unitCard === draggedUnitCard);
+            if (originalSlot) {
+                originalSlot.unitCard = null;
+            }
+            draggedUnitCard.destroy();
+            return; // Exit after selling
+        }
+
+
+        // Find the slot object (from armySlots or stashSlots) that corresponds to the dropZone image
+        const targetSlot = this.armySlots.find(slot => slot.image === dropZone) ||
+                           this.stashSlots.find(slot => slot.image === dropZone);
+
+        if (!targetSlot) {
+            console.log("Dropped on an invalid drop zone.");
+            // Revert card to original position
+            gameObject.x = draggedUnitCard.originalX;
+            gameObject.y = draggedUnitCard.originalY;
+            return;
+        }
+
+        // Check if the target slot is empty
+        if (targetSlot.unitCard !== null) {
+            console.log("Target slot is already occupied.");
+            // Revert card to original position
+            gameObject.x = draggedUnitCard.originalX;
+            gameObject.y = draggedUnitCard.originalY;
+            return;
+        }
+
+        // Logic for purchasing/moving card
+        if (draggedUnitCard.isShopCard) { // Card from shop
+            // This is a new card from the shop
+            if (this.playerGold >= this.SHOP_CARD_BUY_COST) {
+                this.playerGold -= this.SHOP_CARD_BUY_COST;
+                this.registry.set('playerGold', this.playerGold);
+                this.updateGoldDisplay();
+
+                // Move card to new slot
+                targetSlot.unitCard = draggedUnitCard;
+                draggedUnitCard.cardContainer.x = targetSlot.x;
+                draggedUnitCard.cardContainer.y = targetSlot.y;
+                draggedUnitCard.isShopCard = false; // It's no longer a shop card
+
+                // Remove from shopCards array and generate a new one
+                const shopCardIndex = this.shopCards.findIndex(card => card === draggedUnitCard);
+                if (shopCardIndex !== -1) {
+                    this.shopCards[shopCardIndex] = null; // Mark as null, will be replaced on refresh
+                }
+                this.updateButtonStates();
+            } else {
+                console.log("Not enough gold to buy this unit!");
+                // Revert card to original position
+                gameObject.x = draggedUnitCard.originalX;
+                gameObject.y = draggedUnitCard.originalY;
+            }
+        } else {
+            // Card is from army or stash, just moving it
+            // Remove from original slot
+            const originalSlot = this.armySlots.find(slot => slot.unitCard === draggedUnitCard) ||
+                                 this.stashSlots.find(slot => slot.unitCard === draggedUnitCard);
+            if (originalSlot) {
+                originalSlot.unitCard = null;
+            }
+
+            // Place in new slot
+            targetSlot.unitCard = draggedUnitCard;
+            draggedUnitCard.cardContainer.x = targetSlot.x;
+            draggedUnitCard.cardContainer.y = targetSlot.y;
+        }
+
+        this.updateArmyAndStashData(); // Save changes
+        this.displayArmy();
+        this.displayStash();
+        this.checkForCombinations();
+    }
+
+    handleDragEnd(pointer, gameObject, dropped) {
+        // 'gameObject' is the UnitCard's cardContainer
+        this.sellSlot.setVisible(false); // Always hide sell slot on drag end
+
+        if (!dropped && this.currentDraggingCard) {
+            // If the card was not dropped on a valid target, revert its position
+            const draggedUnitCard = this.shopCards.find(card => card && card.cardContainer === this.currentDraggingCard) ||
+                                   this.armySlots.find(slot => slot.unitCard && slot.unitCard.cardContainer === this.currentDraggingCard)?.unitCard ||
+                                   this.stashSlots.find(slot => slot.unitCard && slot.unitCard.cardContainer === this.currentDraggingCard)?.unitCard;
+            if (draggedUnitCard) {
+                gameObject.x = draggedUnitCard.originalX;
+                gameObject.y = draggedUnitCard.originalY;
+            }
+        }
+        this.currentDraggingCard = null;
+    }
+
+    updateArmyAndStashData() {
+        // Update playerArmy
+        this.playerArmy = this.armySlots.filter(slot => slot.unitCard !== null)
+            .map(slot => slot.unitCard.config);
+        this.registry.set('playerArmy', this.playerArmy);
+
+        // Update stash
+        this.stash = this.stashSlots.filter(slot => slot.unitCard !== null)
+            .map(slot => slot.unitCard.config);
+        this.registry.set('stash', this.stash);
+    }
+
+    displayStash() {
+        // Clear existing display
+        this.stashSlots.forEach(slot => {
+            if (slot.unitCard) {
+                slot.unitCard.destroy();
+                slot.unitCard = null;
+            }
+        });
+
+        // Redraw stash
+        this.stash.forEach((unitData, i) => {
+            if (i < this.stashSlots.length) {
+                const slot = this.stashSlots[i];
+                const card = new UnitCard(this, slot.x, slot.y, unitData);
+                card.cardContainer.setScale(1.5);
+                slot.unitCard = card;
+            }
+        });
     }
 
     // --- Utility Functions (mostly unchanged) ---

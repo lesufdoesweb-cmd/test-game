@@ -6,6 +6,9 @@ export class UnitCard {
         this.x = x;
         this.y = y;
         this.config = config; // Store the whole config
+        this.originalX = x; // Store initial position for drag reset
+        this.originalY = y; // Store initial position for drag reset
+        this.isShopCard = config.isShopCard || false; // New property to identify shop cards
 
         this.rarityEmitter = null;
         this.idleTween = null;
@@ -16,7 +19,7 @@ export class UnitCard {
         // Holds everything, handles movement and scaling.
         this.cardContainer = scene.add.container(x, y);
         this.cardContainer.setDepth(10);
-        this.cardContainer.setScale(2);
+        this.cardContainer.setScale(1.5);
 
         // Shadow goes into Outer container so it DOESN'T get the outline FX
         this.shadow = scene.add.image(10, 10, ASSETS.image.unit_card_common.key);
@@ -36,7 +39,7 @@ export class UnitCard {
         this.outlineFX = this.innerCardContainer.postFX.addGlow(0xffffff, 0, 0, false, 0.1, 24);
 
         // Setup Visuals (populates innerCardContainer)
-        this.setupCardVisuals(this.config.unit, this.config.rarity, this.config.stats);
+        this.setupCardVisuals(this.config.unit, this.config.rarity, this.config.stats, this.config.stars);
 
         // Setup Interaction on the outer container
         this.cardContainer.setSize(this.width, this.height);
@@ -92,6 +95,44 @@ export class UnitCard {
                 duration: 200
             });
         });
+
+        this.scene.input.setDraggable(this.cardContainer);
+
+        this.cardContainer.on('dragstart', (pointer, dragX, dragY) => {
+            this.scene.children.bringToTop(this.cardContainer);
+            this.cardContainer.setScale(1.65); // Slightly larger when dragging
+            if (this.components.bg) this.components.bg.setTint(0x999999);
+            if (this.components.sprite) this.components.sprite.setTint(0x999999);
+            this.originalDepth = this.cardContainer.depth; // Store original depth
+            this.cardContainer.setDepth(999); // Bring to top
+
+            // Store the initial position
+            this.originalX = this.cardContainer.x;
+            this.originalY = this.cardContainer.y;
+        });
+
+        this.cardContainer.on('drag', (pointer, dragX, dragY) => {
+            this.cardContainer.x = dragX;
+            this.cardContainer.y = dragY;
+        });
+
+        this.cardContainer.on('dragend', (pointer, dragX, dragY, dropped) => {
+            this.cardContainer.setScale(1.5); // Reset scale
+            if (this.components.bg) this.components.bg.clearTint();
+            if (this.components.sprite) this.components.sprite.clearTint();
+            this.cardContainer.setDepth(this.originalDepth); // Restore original depth
+
+            if (!dropped) {
+                // If not dropped on a valid target, return to original position
+                this.scene.tweens.add({
+                    targets: this.cardContainer,
+                    x: this.originalX,
+                    y: this.originalY,
+                    duration: 200,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        });
     }
 
     startIdleAnimation() {
@@ -113,7 +154,7 @@ export class UnitCard {
         }
     }
 
-    setupCardVisuals(unit, rarity, stats) {
+    setupCardVisuals(unit, rarity, stats, stars) {
         // Clean inner container ONLY.
         this.innerCardContainer.removeAll(true);
 
@@ -158,8 +199,31 @@ export class UnitCard {
         }
 
         // Sprite
-        const sprite = this.scene.add.sprite(0, -10, unit.textureKey);
+        const sprite = this.scene.add.sprite(0, 19, unit.textureKey); // Changed y to 10
+        sprite.setOrigin(0.5, 1); // Set origin to feet
         this.innerCardContainer.add(sprite);
+
+        // Stars
+        const starCount = stars || 1;
+        const starScale = 0.5;
+        const starSpacing = 30 * starScale; // Increased spacing
+        const startX = -starSpacing; // To center the 3 stars
+        const startY = -42;
+
+        for (let i = 0; i < 3; i++) {
+            const starEmpty = this.scene.add.image(startX + (i * starSpacing), startY, ASSETS.image.star_empty.key);
+            starEmpty.setScale(starScale);
+            this.innerCardContainer.add(starEmpty);
+        }
+
+        for (let i = 0; i < starCount; i++) {
+            if (i < 3) { // Make sure we don't draw more than 3 stars
+                const starFilled = this.scene.add.image(startX + (i * starSpacing), startY, ASSETS.image.star.key);
+                starFilled.setScale(starScale);
+                this.innerCardContainer.add(starFilled);
+            }
+        }
+
 
         // Text
         const hpText = this.scene.add.bitmapText(0, 25, 'editundo_55', `HP: ${stats.maxHealth}`, 28)
@@ -254,7 +318,7 @@ export class UnitCard {
         this.isAnimating = true;
         this.scene.tweens.add({
             targets: this.cardContainer,
-            scale: 2,
+            scale: 1.5,
             duration: 400,
             ease: 'Back.out',
             onComplete: () => {
@@ -271,7 +335,7 @@ export class UnitCard {
 
     refreshContent(newConfig) {
         this.config = newConfig; // Update the internal config
-        const { unit, rarity, stats } = newConfig;
+        const { unit, rarity, stats, stars } = newConfig;
 
         this.isAnimating = true;
         this.stopIdleAnimation();
@@ -304,7 +368,7 @@ export class UnitCard {
             {
                 at: jumpDuration + (flipDuration / 2),
                 run: () => {
-                    this.setupCardVisuals(unit, rarity, stats);
+                    this.setupCardVisuals(unit, rarity, stats, stars);
                     this.setHiddenState();
                     // Update size on outer container
                     this.cardContainer.setSize(this.width, this.height);
@@ -314,7 +378,7 @@ export class UnitCard {
                 at: jumpDuration + (flipDuration / 2) + 1,
                 tween: {
                     targets: this.cardContainer,
-                    scaleX: 2,
+                    scaleX: 1.5,
                     duration: flipDuration / 2,
                     ease: 'Linear'
                 }
