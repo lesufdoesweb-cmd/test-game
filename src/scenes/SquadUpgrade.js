@@ -14,6 +14,7 @@ export class SquadUpgrade extends Phaser.Scene {
 
         this.rarityTiers = rarityTiers;
         this.currentDraggingCard = null;
+        this.costDisplay = null;
 
         // Define economic constants
         this.SHOP_CARD_BUY_COST = 3;
@@ -105,6 +106,8 @@ export class SquadUpgrade extends Phaser.Scene {
         this.input.on('drag', this.handleDrag, this);
         this.input.on('drop', this.handleDrop, this);
         this.input.on('dragend', this.handleDragEnd, this);
+        this.input.on('dragenter', this.handleDragEnter, this);
+        this.input.on('dragleave', this.handleDragLeave, this);
     }
 
     createSellZone(width, yPos) {
@@ -222,6 +225,8 @@ export class SquadUpgrade extends Phaser.Scene {
 
             if (!cardInstance.isShopCard) {
                 this.sellSlot.setVisible(true);
+            } else {
+                this.createCostDisplayFor(gameObject);
             }
         }
     }
@@ -229,6 +234,11 @@ export class SquadUpgrade extends Phaser.Scene {
     handleDrag(pointer, gameObject, dragX, dragY) {
         gameObject.x = dragX;
         gameObject.y = dragY;
+
+        if (this.costDisplay) {
+            this.costDisplay.x = dragX;
+            this.costDisplay.y = dragY - (gameObject.displayHeight / 2) - 20;
+        }
     }
 
     handleDrop(pointer, gameObject, dropZone) {
@@ -342,6 +352,22 @@ export class SquadUpgrade extends Phaser.Scene {
         this.sellSlot.setVisible(false);
         this.currentDraggingCard = null;
 
+        if (this.costDisplay) {
+            this.costDisplay.destroy();
+            this.costDisplay = null;
+        }
+        [...this.armySlots, ...this.stashSlots].forEach(slot => {
+            if (slot.image.glowEffect) {
+                slot.image.postFX.remove(slot.image.glowEffect);
+                delete slot.image.glowEffect;
+            }
+        });
+        const sellBg = this.sellSlot.getAt(0);
+        if (sellBg.glowEffect) {
+            sellBg.postFX.remove(sellBg.glowEffect);
+            delete sellBg.glowEffect;
+        }
+
         if (!dropped) {
             const card = this.getCardFromContainer(gameObject);
             if(card) this.revertDrag(gameObject, card);
@@ -358,6 +384,53 @@ export class SquadUpgrade extends Phaser.Scene {
             }
         });
         return card;
+    }
+
+    handleDragEnter(pointer, gameObject, dropZone) {
+        let targetImage;
+        const draggedCard = this.getCardFromContainer(this.currentDraggingCard);
+        if (!draggedCard) return;
+
+        if (dropZone.name === 'sell_slot') {
+            if (draggedCard.isShopCard) return; // Can't sell shop cards
+            targetImage = this.sellSlot.getAt(0); // The 'bg' image
+        } else {
+            targetImage = dropZone;
+        }
+
+        if (targetImage && !targetImage.glowEffect) {
+            const glow = targetImage.postFX.addGlow(0xffffff, 0.7, 0, false, 0.1, 15);
+            targetImage.glowEffect = glow;
+        }
+    }
+
+    handleDragLeave(pointer, gameObject, dropZone) {
+        let targetImage;
+        if (dropZone.name === 'sell_slot') {
+            targetImage = this.sellSlot.getAt(0);
+        } else {
+            targetImage = dropZone;
+        }
+
+        if (targetImage && targetImage.glowEffect) {
+            targetImage.postFX.remove(targetImage.glowEffect);
+            delete targetImage.glowEffect;
+        }
+    }
+
+    createCostDisplayFor(cardContainer) {
+        if (this.costDisplay) {
+            this.costDisplay.destroy();
+        }
+
+        const cost = this.SHOP_CARD_BUY_COST;
+        this.costDisplay = this.add.container(cardContainer.x, cardContainer.y - 80);
+        this.costDisplay.setDepth(10);
+
+        const goldIcon = this.add.image(15, 0, ASSETS.image.coin.key).setScale(0.5);
+        const costText = this.add.bitmapText(-5, 0, 'editundo_23', `${cost}`, 24).setOrigin(1, 0.5);
+
+        this.costDisplay.add([goldIcon, costText]);
     }
 
     checkForCombinations() {
