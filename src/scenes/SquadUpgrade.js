@@ -21,7 +21,7 @@ export class SquadUpgrade extends Phaser.Scene {
         this.SELL_RETURN = 2;
 
         // Visual Constants
-        this.ARMY_SCALE = 1.5;
+        this.ARMY_SCALE = 1.2; // Decreased from 1.5
         this.STASH_SCALE = 0.9;
     }
 
@@ -83,17 +83,13 @@ export class SquadUpgrade extends Phaser.Scene {
         bgImage.setScale(Math.max(width / bgImage.width, height / bgImage.height)).setDepth(0);
 
         // --- TOP UI ---
-        // Refresh Button (Top Left)
         this.refreshBtn = this.createUIButton(100, 60, 'Refresh', this.handleRefresh);
 
-        // Gold Display (Top Left, next to Refresh)
         this.goldIcon = this.add.image(this.refreshBtn.x + 100, 60, ASSETS.image.coin.key).setScale(0.7).setDepth(2);
         this.goldText = this.add.bitmapText(this.goldIcon.x + 30, 60, 'editundo_23', `${this.playerGold}`, 24).setOrigin(0, 0.5).setDepth(2);
 
-        // Start Battle Button (Top Right)
         this.startBattleBtn = this.createUIButton(width - 150, 60, 'Start Battle', this.handleStartBattle);
 
-        // Title Text (Center, slightly lower)
         const titleText = this.isFirstTime ? 'SQUAD SELECTION' : 'SQUAD UPGRADES';
         this.purchaseLimitText = this.add.bitmapText(width / 2, 100, 'editundo_55', titleText, 28).setOrigin(0.5).setDepth(2);
 
@@ -101,9 +97,8 @@ export class SquadUpgrade extends Phaser.Scene {
         this.createArmySlots(width, height);
         this.createStashSlots(width, height);
 
-        // --- Sell Zone (Above Shop Cards) ---
-        // Placed around Y=180, above the shop cards
-        this.createSellZone(width, 180);
+        // --- Sell Zone (Moved Higher) ---
+        this.createSellZone(width, 130);
 
         // Drag Handlers
         this.input.on('dragstart', this.handleDragStart, this);
@@ -157,7 +152,6 @@ export class SquadUpgrade extends Phaser.Scene {
     }
 
     createStashSlots(width, height) {
-        // "Reserves" text
         const labelX = width - 120;
 
         const columns = 2;
@@ -170,10 +164,8 @@ export class SquadUpgrade extends Phaser.Scene {
         const totalW = (columns * cardWidth) + ((columns - 1) * spacingX);
         const totalH = (rows * cardHeight) + ((rows - 1) * spacingY);
 
-        // Lower position: Instead of centered, push towards bottom
-        // Align bottom of stash with top of army label area? Or just lower than center.
         const startX = labelX;
-        const startY = (height / 2) + 50; // Pushed down by 50px from center
+        const startY = (height / 2) + 50;
 
         this.add.bitmapText(labelX, startY - (totalH/2) - 30, 'editundo_55', 'RESERVES', 20).setOrigin(0.5).setTint(0xaaaaaa);
 
@@ -205,22 +197,18 @@ export class SquadUpgrade extends Phaser.Scene {
             slot.unitCard.destroy();
         }
 
-        // Ensure we pass 'this' as the scene
         const card = new UnitCard(this, slot.x, slot.y, config);
 
-        // Safety check for method existence
         if (typeof card.setCardScale === 'function') {
             card.setCardScale(slot.scale);
         } else {
             console.error("setCardScale missing on unit card!", card);
-            card.cardContainer.setScale(slot.scale); // Fallback
+            card.cardContainer.setScale(slot.scale);
         }
 
         slot.unitCard = card;
         return card;
     }
-
-    // --- Interaction Logic ---
 
     handleDragStart(pointer, gameObject) {
         this.children.bringToTop(gameObject);
@@ -247,13 +235,11 @@ export class SquadUpgrade extends Phaser.Scene {
         const draggedCard = this.getCardFromContainer(gameObject);
         if (!draggedCard) return;
 
-        // 1. Sell Zone
         if (dropZone.name === 'sell_slot' && !draggedCard.isShopCard) {
             this.handleSellAction(draggedCard);
             return;
         }
 
-        // 2. Identify Target Slot
         const targetSlot = [...this.armySlots, ...this.stashSlots].find(slot => slot.image === dropZone);
 
         if (!targetSlot) {
@@ -261,7 +247,6 @@ export class SquadUpgrade extends Phaser.Scene {
             return;
         }
 
-        // 3. Buying
         if (draggedCard.isShopCard) {
             if (targetSlot.unitCard) {
                 console.log("Slot occupied.");
@@ -275,7 +260,6 @@ export class SquadUpgrade extends Phaser.Scene {
             return;
         }
 
-        // 4. Moving
         const sourceSlot = [...this.armySlots, ...this.stashSlots].find(slot => slot.unitCard === draggedCard);
 
         if (sourceSlot === targetSlot) {
@@ -286,7 +270,6 @@ export class SquadUpgrade extends Phaser.Scene {
         if (targetSlot.unitCard === null) {
             this.moveCard(sourceSlot, targetSlot, draggedCard);
         } else {
-            // Swap logic could go here, for now revert
             this.revertDrag(gameObject, draggedCard);
         }
     }
@@ -301,7 +284,6 @@ export class SquadUpgrade extends Phaser.Scene {
         this.sellSlot.setVisible(false);
         this.updateButtonStates();
 
-        // FIX: Destroy next frame to avoid input errors
         this.time.delayedCall(0, () => {
             card.destroy();
         });
@@ -321,7 +303,6 @@ export class SquadUpgrade extends Phaser.Scene {
             this.shopCards[shopIndex] = null;
         }
 
-        // FIX: Destroy next frame to avoid input errors
         this.time.delayedCall(0, () => {
             shopCard.destroy();
         });
@@ -338,7 +319,6 @@ export class SquadUpgrade extends Phaser.Scene {
         card.cardContainer.x = targetSlot.x;
         card.cardContainer.y = targetSlot.y;
 
-        // Update scale using method
         if (typeof card.setCardScale === 'function') {
             card.setCardScale(targetSlot.scale);
         }
@@ -409,7 +389,6 @@ export class SquadUpgrade extends Phaser.Scene {
                     const newConfig = { unit, rarity: nextRarity, stats, unitName };
 
                     slotsToMerge.forEach(slot => {
-                        // Destroy next frame
                         const card = slot.unitCard;
                         slot.unitCard = null;
                         if(card) {
@@ -417,7 +396,6 @@ export class SquadUpgrade extends Phaser.Scene {
                         }
                     });
 
-                    // Create upgraded card after delay to allow destroy to clear
                     this.time.delayedCall(50, () => {
                         this.createCardInSlot(firstSlot, newConfig);
                         this.sound.play('select_sound');
@@ -444,7 +422,7 @@ export class SquadUpgrade extends Phaser.Scene {
         const unitKeys = Object.keys(UNIT_TYPES).filter(key => UNIT_TYPES[key].isPlayer);
         const startX = 100;
         const gap = 130;
-        const yPos = 260; // Lowered significantly
+        const yPos = 220; // Moved higher (was 260)
 
         for (let i = 0; i < 3; i++) {
             if (this.shopCards[i] === null) {
@@ -536,7 +514,6 @@ export class SquadUpgrade extends Phaser.Scene {
         const enemyPool = levelArmies[this.level - 1] || levelArmies[0];
         const randomEnemyArmy = enemyPool[Math.floor(Math.random() * enemyPool.length)];
 
-        // Get fresh data from slots to ensure sync
         const currentArmy = this.armySlots.map(s => s.unitCard ? s.unitCard.config : null).filter(c => c !== null);
 
         this.scene.start('Game', { playerArmy: { units: currentArmy }, enemyArmy: randomEnemyArmy });

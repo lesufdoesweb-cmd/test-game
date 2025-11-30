@@ -61,6 +61,21 @@ export class UnitCard {
         this.cardContainer.setScale(scale);
     }
 
+    /**
+     * Updates the logical and visual position of the card.
+     * Crucial for ensuring hover animations return to the correct spot after a move.
+     */
+    updatePosition(x, y) {
+        this.x = x;
+        this.y = y;
+        this.cardContainer.x = x;
+        this.cardContainer.y = y;
+
+        // Also update original positions so drag reverts go to the new home
+        this.originalX = x;
+        this.originalY = y;
+    }
+
     setupInteractions() {
         this.cardContainer.on('pointerover', () => {
             if (this.isAnimating) return;
@@ -247,7 +262,7 @@ export class UnitCard {
         this.cardContainer.setScale(0);
         this.scene.tweens.add({
             targets: this.cardContainer,
-            scale: 1.5,
+            scale: this.currentScale, // UPDATED: Use currentScale instead of hardcoded 1.5
             duration: 400,
             ease: 'Back.out',
             onComplete: () => {
