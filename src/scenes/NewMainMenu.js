@@ -104,6 +104,16 @@ export class NewMainMenu extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
 
+        const mainMenuFlag = this.add.image(width / 2, height * 0.075, 'main_menu_flag').setDepth(3).setScale(2);
+        this.tweens.add({
+            targets: mainMenuFlag,
+            y: mainMenuFlag.y - 3,
+            duration: 500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
+
         // 1. Create Background
         const bgImage = this.add.image(width / 2, height / 2, 'main_menu_background');
         const scaleX = width / bgImage.width;

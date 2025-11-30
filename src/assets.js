@@ -30,6 +30,10 @@ export default {
             key: 'main_menu_front',
             args: ['src/assets/backgrounds/main_menu_front.png']
         },
+        main_menu_flag: {
+            key: 'main_menu_flag',
+            args: ['src/assets/backgrounds/main_menu_flag.png']
+        },
         cloud_1: {
             key: 'cloud_1',
             args: ['src/assets/backgrounds/cloud_1.png']
