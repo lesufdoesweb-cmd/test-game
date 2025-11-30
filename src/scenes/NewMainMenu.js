@@ -136,6 +136,11 @@ export class NewMainMenu extends Phaser.Scene {
             // Does nothing for now
         });
 
+        const recruitButton = this.createButton(width * 0.9, height / 2, 'Recruit', () => {
+            // Does nothing for now
+        });
+
+
         // ... [Rest of your particle and fire code remains exactly the same] ...
 
         const particles = this.add.particles(0, 0, 'pixel', {
@@ -243,7 +248,7 @@ export class NewMainMenu extends Phaser.Scene {
         createFireBeam(255, 190, 'fire_beam_texture');
         createFireBeam(442, 100, 'fire_beam_texture_2');
 
-        this.createButton(width - 80, 50, 'Options', () => {
+        this.createButton(width * 0.9, height * 0.075, 'Options', () => {
         });
 
         const startButton = this.add.image((width / 2) - 78, height / 2, 'start_button').setInteractive({ useHandCursor: true });
@@ -286,6 +291,61 @@ export class NewMainMenu extends Phaser.Scene {
             this.registry.set('isFirstTime', true);
 
             this.scene.start('SquadUpgrade');
+        });
+        this.anims.create({
+            key: 'costel_anim',
+            frames: [
+                { key: 'costel', frame: 0, duration: 4000 },
+                { key: 'costel', frame: 1, duration: 150 },
+                { key: 'costel', frame: 2, duration: 150 },
+                { key: 'costel', frame: 3, duration: 2500 },
+                { key: 'costel', frame: 2, duration: 150 },
+                { key: 'costel', frame: 1, duration: 150 }
+            ],
+            repeat: -1,
+        });
+
+        const costelSprite = this.add.sprite(width * 0.91, height * 0.627, 'costel');
+        costelSprite.setScale(1.5);
+        costelSprite.play('costel_anim');
+        costelSprite.setDepth(101);
+
+        this.anims.create({
+            key: 'vlad_anim',
+            frames: [
+                { key: 'vlad', frame: 0, duration: 2000 },
+                { key: 'vlad', frame: 1, duration: 200 },
+                { key: 'vlad', frame: 2, duration: 50 },
+                { key: 'vlad', frame: 3, duration: 50 },
+                { key: 'vlad', frame: 2, duration: 50 },
+                { key: 'vlad', frame: 1, duration: 150 }
+            ],
+            repeat: -1,
+        });
+
+        const vladSprite = this.add.sprite(width * 0.22, height * 0.68, 'vlad');
+        vladSprite.setScale(2);
+        vladSprite.play('vlad_anim');
+        vladSprite.setDepth(101);
+
+        const sparkEmitter = this.add.particles(0, 0, 'pixel', {
+            lifespan: 500,
+            speed: { min: 50, max: 200 },
+            angle: { min: 200, max: 340 },
+            gravityY: 400,
+            scale: { start: 3, end: 0 },
+            tint: [0xffff00, 0xffffff],
+            blendMode: 'ADD',
+            emitting: false,
+            emitZone: { source: new Phaser.Geom.Rectangle(-15, 40, 30, 10), type: 'random' }
+        });
+        sparkEmitter.setDepth(102);
+
+        vladSprite.on('animationupdate', (anim, frame) => {
+            if (anim.key === 'vlad_anim' && frame.index === 4) {
+                sparkEmitter.setPosition(vladSprite.x + 25, vladSprite.y - 30);
+                sparkEmitter.explode(15);
+            }
         });
         // Removed the camera postFX line here
     }

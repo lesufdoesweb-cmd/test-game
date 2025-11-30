@@ -208,6 +208,20 @@ export default {
         }
     },
     'spritesheet': {
+        vlad: {
+            key: 'vlad',
+            args: ['src/assets/backgrounds/vlad.png', {
+                frameWidth: 80,
+                frameHeight: 63,
+            }]
+        },
+        costel: {
+            key: 'costel',
+            args: ['src/assets/backgrounds/costel.png', {
+                frameWidth: 60,
+                frameHeight: 44,
+            }]
+        },
         items: {
             key: 'items',
             args: ['src/assets/sprites/units/items.png', {
