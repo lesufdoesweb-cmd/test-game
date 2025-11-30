@@ -90,6 +90,9 @@ export class Preloader extends Phaser.Scene {
     }
 
     create() {
+        this.registry.set('playerBeers', 100);
+        this.registry.set('unlockedUnits', ['Archer', 'Knight', 'Paladin', 'Wizard']);
+
         this.scene.launch('Background');
         this.scene.start('NewMainMenu');
     }

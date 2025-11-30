@@ -229,6 +229,22 @@ export default {
         coin: {
             key: 'coin',
             args: ['src/assets/backgrounds/coin.png']
+        },
+        modal_recruits: {
+            key: 'modal_recruits',
+            args: ['src/assets/backgrounds/modal_recruits.png']
+        },
+        x_button: {
+            key: 'x_button',
+            args: ['src/assets/backgrounds/x_button.png']
+        },
+        beer_icon: {
+            key: 'beer_icon',
+            args: ['src/assets/icons/beer.png']
+        },
+        banner_recruit_screen: {
+            key: 'banner_recruit_screen',
+            args: ['src/assets/backgrounds/banner_recruit_screen.png']
         }
     },
     'spritesheet': {

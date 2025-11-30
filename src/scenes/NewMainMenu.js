@@ -1,3 +1,5 @@
+import { RecruitPopup } from '../ui/RecruitPopup.js';
+
 export class NewMainMenu extends Phaser.Scene {
     constructor() {
         super('NewMainMenu');
@@ -104,6 +106,8 @@ export class NewMainMenu extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
 
+        this.interactiveElements = [];
+
         const mainMenuFlag = this.add.image(width / 2, height * 0.075, 'main_menu_flag').setDepth(3).setScale(2);
         this.tweens.add({
             targets: mainMenuFlag,
@@ -145,10 +149,13 @@ export class NewMainMenu extends Phaser.Scene {
         const upgradesButton = this.createButton(width * 0.1, height / 2, 'Upgrades', () => {
             // Does nothing for now
         });
+        this.interactiveElements.push(upgradesButton);
 
         const recruitButton = this.createButton(width * 0.9, height / 2, 'Recruit', () => {
-            // Does nothing for now
+            this.recruitPopup.show();
+            this.interactiveElements.forEach(element => element.disableInteractive());
         });
+        this.interactiveElements.push(recruitButton);
 
 
         // ... [Rest of your particle and fire code remains exactly the same] ...
@@ -258,12 +265,14 @@ export class NewMainMenu extends Phaser.Scene {
         createFireBeam(255, 190, 'fire_beam_texture');
         createFireBeam(442, 100, 'fire_beam_texture_2');
 
-        this.createButton(width * 0.9, height * 0.075, 'Options', () => {
+        const optionsButton = this.createButton(width * 0.9, height * 0.075, 'Options', () => {
         });
+        this.interactiveElements.push(optionsButton);
 
         const startButton = this.add.image((width / 2) - 78, height / 2, 'start_button').setInteractive({ useHandCursor: true });
         startButton.setScale(3);
         startButton.setDepth(5);
+        this.interactiveElements.push(startButton);
 
 // 1. Important: Add padding to the texture so the outline doesn't get cut off
 // Since you are scaling by 3, we need a bit of extra space for the glow.
@@ -299,6 +308,7 @@ export class NewMainMenu extends Phaser.Scene {
             this.registry.set('playerArmy', []);
             this.registry.set('shopRefreshes', 3);
             this.registry.set('isFirstTime', true);
+            this.registry.set('playerBeers', 10);
 
             this.scene.start('SquadUpgrade');
         });
@@ -358,5 +368,10 @@ export class NewMainMenu extends Phaser.Scene {
             }
         });
         // Removed the camera postFX line here
+
+        this.recruitPopup = new RecruitPopup(this);
+        this.recruitPopup.on('popupClosed', () => {
+            this.interactiveElements.forEach(element => element.setInteractive({ useHandCursor: true }));
+        });
     }
 }

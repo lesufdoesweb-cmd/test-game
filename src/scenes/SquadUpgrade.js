@@ -86,19 +86,19 @@ export class SquadUpgrade extends Phaser.Scene {
         // --- TOP UI ---
         this.refreshBtn = this.createUIButton(100, 60, 'Refresh', this.handleRefresh);
 
-        const goldDisplayX = this.refreshBtn.x + 100;
+        const goldDisplayX = this.refreshBtn.x + 140;
 
         // Create a container for the gold display
         this.goldDisplayContainer = this.add.container(goldDisplayX, 60).setDepth(2);
 
         // Add background
-        const bgGold = this.add.image(0, 0, ASSETS.image.button_background.key).setScale(0.8, 0.6);
+        const bgGold = this.add.image(0, 0, ASSETS.image.button_background.key).setScale(0.3);
         this.goldDisplayContainer.add(bgGold);
 
-        this.goldIcon = this.add.image(-30, 0, ASSETS.image.coin.key).setScale(0.7);
+        this.goldIcon = this.add.image(-40, 0, ASSETS.image.coin.key).setScale(0.7);
         this.goldDisplayContainer.add(this.goldIcon);
 
-        this.goldText = this.add.bitmapText(0, 0, 'editundo_23', `${this.playerGold}`, 24).setOrigin(0, 0.5);
+        this.goldText = this.add.bitmapText(-25, -10, 'editundo_23', `${this.playerGold}`, 24);
         this.goldDisplayContainer.add(this.goldText);
 
         this.startBattleBtn = this.createUIButton(width - 150, 60, 'Start Battle', this.handleStartBattle);
